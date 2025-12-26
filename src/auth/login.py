@@ -86,7 +86,7 @@ class Authenticator:
         await self.browser.click(LOGIN_BUTTON_SELECTOR)
         
         # Wait for page to load
-        await self.browser.humanizer.random_delay(35000, 10000)
+        await self.browser.humanizer.random_delay(5000, 10000)
         
         # Check for login errors
         if await self._has_login_error():
