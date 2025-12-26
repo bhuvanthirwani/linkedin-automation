@@ -1,0 +1,36 @@
+# LinkedIn Automation Configuration
+
+linkedin:
+  # Credentials (prefer environment variables: LINKEDIN_EMAIL, LINKEDIN_PASSWORD)
+  email: "useremail@gmail.com"
+  password: "userpassword"
+  base_url: "https://www.linkedin.com"
+
+browser:
+  headless: false
+  timeout: 30000  # milliseconds
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  viewport_width: 1920
+  viewport_height: 1080
+
+rate_limits:
+  daily_connection_limit: 25
+  daily_message_limit: 50
+  min_delay_seconds: 2
+  max_delay_seconds: 5
+  page_load_delay_seconds: 3
+
+search:
+  max_pages: 10
+  skip_duplicates: true
+
+messaging:
+  connection_note_template: "Hi {first_name}, I'd love to connect and learn more about your work at {company}!"
+  max_note_length: 300
+  follow_up_templates:
+    - "Hi {first_name}, thanks for connecting! I'd love to learn more about your experience at {company}."
+    - "Great to connect, {first_name}! Looking forward to staying in touch."
+
+paths:
+  cookies_dir: "./data/cookies"
+  tracking_dir: "./data/tracking"

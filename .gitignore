@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Data (sensitive)
+data/cookies/
+data/tracking/
+
+# Config files (sensitive)
+# Ignore actual config files (contain sensitive credentials)
+configs/config.yaml
+configs/config.yml
+configs/config.json
+# Keep example/template files for reference
+# (example files are explicitly tracked, not ignored)
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Playwright
+playwright-report/
+test-results/
+config/configs.yaml
