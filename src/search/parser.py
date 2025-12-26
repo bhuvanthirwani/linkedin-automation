@@ -114,6 +114,8 @@ class ProfileParser:
             # Extract first name and company from headline
             first_name, last_name = self._split_name(name)
             company = self._extract_company(headline)
+            if company == "" or "Engineer" in company:
+                company = "your company"
             title = self._extract_title(headline)
             
             return Profile(
@@ -153,6 +155,8 @@ class ProfileParser:
             
             first_name, last_name = self._split_name(name)
             company = self._extract_company(headline)
+            if company == "" or "Engineer" in company:
+                company = "your company"
             title = self._extract_title(headline)
             
             return Profile(
