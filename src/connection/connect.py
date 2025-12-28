@@ -35,6 +35,9 @@ NOTE_TEXTAREA = "textarea[name='message'], textarea#custom-message"
 SEND_BUTTON = "button[aria-label='Send now'], button[aria-label='Send invitation']"
 PENDING_BUTTON = "section.artdeco-card button[aria-label*='Pending']"
 MESSAGE_BUTTON = "section.artdeco-card button[aria-label*='Message']"
+# Selector for email requirement in modal
+EMAIL_INPUT = "input#email, input[name='email']"
+EMAIL_REQUIRED_TEXT = "text='please enter their email to connect'"
 
 
 class ConnectionManager:
@@ -144,6 +147,35 @@ class ConnectionManager:
             
             logger.info("Connect button clicked successfully, waiting for modal...")
             await self.browser.humanizer.random_delay(5000, 10000)
+            
+            # Check if email is required
+            logger.debug("Checking if email is required to connect...")
+            email_input_exists = await self.browser.element_exists(EMAIL_INPUT)
+            # Use text search for the specific message mentioned by user
+            email_text_exists = await self.browser.page.locator(f"text='enter their email'").count() > 0 or \
+                                await self.browser.page.locator(f"text='email to connect'").count() > 0
+            
+            if email_input_exists or email_text_exists:
+                logger.warning(f"Email required to connect with {profile.name}. Skipping and deleting.")
+                # Record as BLOCKED in database
+                if self.database_manager:
+                    await self.database_manager.record_connection_request(profile.url, "BLOCKED")
+                    # Delete from raw_linkedin_ingest as requested
+                    await self.database_manager.delete_from_raw_ingest(profile.url)
+                
+                # Close modal if it's open (usually by clicking Escape or the close button)
+                try:
+                    await self.browser.page.keyboard.press("Escape")
+                    await self.browser.humanizer.random_delay(1000, 2000)
+                except:
+                    pass
+                    
+                return ConnectionRequest(
+                    profile_url=profile.url,
+                    profile_name=profile.name,
+                    status=ConnectionStatus.ERROR,
+                    error="Email required to connect",
+                )
             
             # Add note if provided
             final_note = ""

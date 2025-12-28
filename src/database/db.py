@@ -434,3 +434,34 @@ class DatabaseManager:
             logger.error(f"Failed to record connection request: {e}")
             return False
 
+    async def delete_from_raw_ingest(self, url: str) -> bool:
+        """
+        Delete a profile from the raw_linkedin_ingest table.
+        
+        Args:
+            url: LinkedIn URL of the profile to delete
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.pool:
+            logger.error("Database not connected. Call connect() first.")
+            return False
+            
+        try:
+            effective_schema = self.schema or 'public'
+            schema_quoted = f'"{effective_schema}"'
+            table_name = "linkedin_db_raw_linkedin_ingest"
+            table_quoted = f'"{table_name}"'
+            
+            query = f'DELETE FROM {schema_quoted}.{table_quoted} WHERE "linkedin_url" = $1'
+            
+            async with self.pool.acquire() as conn:
+                await conn.execute(query, url)
+                
+            logger.info(f"Deleted {url} from {table_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete {url} from raw_linkedin_ingest: {e}")
+            return False
+
