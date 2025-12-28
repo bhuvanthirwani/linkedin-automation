@@ -8,6 +8,7 @@ import asyncio
 import argparse
 import sys
 from pathlib import Path
+from typing import Optional
 
 from loguru import logger
 
@@ -24,6 +25,7 @@ from .messaging.followup import FollowUpMessenger
 from .messaging.template import TemplateEngine
 from .messaging.tracker import MessageTracker
 from .utils.models import SearchCriteria
+from .database.db import DatabaseManager
 
 
 # Configure logging
@@ -54,6 +56,7 @@ class LinkedInBot:
         self.searcher: UserSearch = None
         self.connection_manager: ConnectionManager = None
         self.messenger: FollowUpMessenger = None
+        self.database_manager: DatabaseManager = None
         
         # Trackers
         self.connection_tracker: ConnectionTracker = None
@@ -85,6 +88,19 @@ class LinkedInBot:
         self.connection_tracker = ConnectionTracker(self.config.paths.tracking_dir)
         self.message_tracker = MessageTracker(self.config.paths.tracking_dir)
         
+        # Create database manager if database config is provided
+        if self.config.database.host and self.config.database.user:
+            self.database_manager = DatabaseManager(
+                host=self.config.database.host,
+                port=self.config.database.port,
+                database=self.config.database.database,
+                user=self.config.database.user,
+                password=self.config.database.password,
+                schema=self.config.database.schema,
+            )
+            await self.database_manager.connect()
+            logger.info("Database manager initialized")
+        
         # Create note composer
         note_composer = NoteComposer(self.config.messaging.connection_note_template)
         
@@ -94,6 +110,7 @@ class LinkedInBot:
             self.connection_tracker,
             note_composer,
             self.config.rate_limits.daily_connection_limit,
+            database_manager=self.database_manager,
         )
         
         # Create template engine
@@ -157,9 +174,9 @@ class LinkedInBot:
                 break
             
             # Check daily limit
-            if self.connection_tracker.get_today_count() >= self.config.rate_limits.daily_connection_limit:
-                logger.warning("Daily connection limit reached")
-                break
+            # if self.connection_tracker.get_today_count() >= self.config.rate_limits.daily_connection_limit:
+            #     logger.warning("Daily connection limit reached")
+            #     break
             
             # Send connection request
             request = await self.connection_manager.send_connection_request(profile)
@@ -177,6 +194,97 @@ class LinkedInBot:
         
         return {
             "profiles_found": len(result.profiles),
+            "connections_sent": connections_sent,
+            "errors": errors,
+        }
+    
+    async def connect_from_database(
+        self,
+        max_connections: int = 10,
+        table_name: Optional[str] = None,
+        where_clause: Optional[str] = None,
+    ) -> dict:
+        """
+        Fetch LinkedIn URLs from database and send connection requests.
+        
+        Args:
+            max_connections: Maximum number of connection requests to send
+            table_name: Optional table name (defaults to config value)
+            where_clause: Optional WHERE clause for filtering
+        
+        Returns:
+            Summary of actions taken.
+        """
+        if not self.database_manager:
+            raise RuntimeError("Database manager not initialized. Check database configuration.")
+        
+        logger.info("Starting database-driven connection workflow")
+        
+        # Use table name from config or parameter
+        table = table_name or self.config.database.table_name
+        
+        # If fetching from raw_linkedin_ingest, use the special method that excludes connection_requests
+        if table in ["raw_linkedin_ingest", "linkedin_db_raw_linkedin_ingest"]:
+            logger.info("Fetching from raw_linkedin_ingest, excluding existing connection requests")
+            profiles = await self.database_manager.fetch_urls_from_raw_ingest(
+                limit=max_connections * 5,  # Get extra to account for failures
+                exclude_connection_requests=True,
+            )
+        else:
+            # Fetch profiles from database
+            exclude_table = self.config.database.exclude_table
+            exclude_url_column = self.config.database.exclude_url_column
+            
+            # Determine appropriate columns based on table name
+            if table in ["candidates", "linkedin_db_candidates"]:
+                additional_columns = ['full_name', 'headline']
+            elif table in ["raw_linkedin_ingest", "linkedin_db_raw_linkedin_ingest"]:
+                additional_columns = ['name', 'title', 'snippet']
+            else:
+                # Default: try common columns, but handle missing ones gracefully
+                additional_columns = ['name', 'title', 'headline', 'full_name']
+            
+            profiles = await self.database_manager.fetch_linkedin_urls(
+                table_name=table,
+                url_column=self.config.database.url_column,
+                limit=max_connections * 2,  # Get extra to account for failures
+                where_clause=where_clause,
+                additional_columns=additional_columns,
+                exclude_table=exclude_table,
+                exclude_url_column=exclude_url_column,
+            )
+        
+        logger.info(f"Fetched {len(profiles)} profiles from database")
+        
+        # Send connection requests
+        connections_sent = 0
+        errors = 0
+        
+        for profile in profiles:
+            if connections_sent >= max_connections:
+                break
+            
+            # Check daily limit
+            # if self.connection_tracker.get_today_count() >= self.config.rate_limits.daily_connection_limit:
+            #     logger.warning("Daily connection limit reached")
+            #     break
+            
+            # Send connection request
+            request = await self.connection_manager.send_connection_request(profile)
+            
+            if request.error:
+                errors += 1
+            else:
+                connections_sent += 1
+            
+            # Random delay between connections
+            await self.browser.humanizer.random_delay(
+                int(self.config.rate_limits.min_delay_seconds * 1000),
+                int(self.config.rate_limits.max_delay_seconds * 1000),
+            )
+        
+        return {
+            "profiles_found": len(profiles),
             "connections_sent": connections_sent,
             "errors": errors,
         }
@@ -204,6 +312,9 @@ class LinkedInBot:
         """Stop the bot and cleanup."""
         logger.info("Stopping LinkedIn Bot")
         
+        if self.database_manager:
+            await self.database_manager.close()
+        
         if self.browser:
             await self.browser.stop()
         
@@ -224,9 +335,21 @@ async def main():
     parser.add_argument(
         "--mode",
         type=str,
-        choices=["search", "followup", "both"],
+        choices=["search", "followup", "both", "database"],
         default="both",
-        help="Operation mode",
+        help="Operation mode (search, followup, both, or database)",
+    )
+    parser.add_argument(
+        "--table",
+        type=str,
+        default=None,
+        help="Database table name (for database mode)",
+    )
+    parser.add_argument(
+        "--where",
+        type=str,
+        default=None,
+        help="WHERE clause for database query (for database mode)",
     )
     parser.add_argument(
         "--keywords",
@@ -292,7 +415,20 @@ async def main():
             sys.exit(1)
         
         # Execute based on mode
-        if args.mode in ["search", "both"]:
+        if args.mode == "database":
+            if args.dry_run:
+                logger.info("[DRY RUN] Would fetch URLs from database and connect")
+            else:
+                if not bot.database_manager:
+                    logger.error("Database manager not initialized. Check database configuration.")
+                    sys.exit(1)
+                result = await bot.connect_from_database(
+                    max_connections=args.max_connections,
+                    table_name=args.table,
+                    where_clause=args.where,
+                )
+                logger.info(f"Database Connect Results: {result}")
+        elif args.mode in ["search", "both"]:
             if args.dry_run:
                 logger.info("[DRY RUN] Would search and connect")
             else:

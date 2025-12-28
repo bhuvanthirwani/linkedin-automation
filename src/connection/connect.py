@@ -11,21 +11,30 @@ from ..browser.browser import BrowserEngine
 from ..utils.models import Profile, ConnectionRequest, ConnectionStatus
 from .note import NoteComposer
 from .tracker import ConnectionTracker
+from ..database.db import DatabaseManager
 
 
-# Selectors for connection actions
-# Direct Connect button: button with aria-label containing "Invite" and "connect" (e.g., "Invite Omar Khan to connect")
-# Also matches button with connect-small icon as fallback
-CONNECT_BUTTON = "button[aria-label*='Invite'][aria-label*='connect'], button:has(svg[data-test-icon='connect-small'])"
-MORE_BUTTON = "button[aria-label='More actions'], button.artdeco-dropdown__trigger"
-# Connect option in dropdown: div with aria-label containing "Invite" and "connect" (e.g., "Invite Shamitha Narra to connect")
-# Also matches dropdown item with connect-medium icon as fallback
-CONNECT_IN_DROPDOWN = "div[aria-label*='Invite'][aria-label*='connect'], div.artdeco-dropdown__item:has(svg[data-test-icon='connect-medium'])"
+# Selectors for connection actions, scoped to the primary profile card (artdeco-card)
+# Direct Connect button: button with aria-label containing "Invite" and "connect"
+# We scope to section.artdeco-card to avoid clicking connect buttons in "People also viewed" or other sections
+CONNECT_BUTTON = "section.artdeco-card button[aria-label*='Invite'][aria-label*='connect'], section.artdeco-card button:has(svg[data-test-icon='connect-small'])"
+MORE_BUTTON = "section.artdeco-card button[aria-label='More actions'], section.artdeco-card button.artdeco-dropdown__trigger"
+
+# Connect option in dropdown: div with aria-label containing "Invite" and "connect"
+# This might be inside the card or at the end of the body depending on the dropdown implementation
+# Added :has-text('Connect') to catch the specific element in the user's snippet
+CONNECT_IN_DROPDOWN = (
+    "div[aria-label*='Invite'][aria-label*='connect'], "
+    "div.artdeco-dropdown__item:has(svg[data-test-icon='connect-medium']), "
+    "div.artdeco-dropdown__item:has-text('Connect'), "
+    ".artdeco-dropdown__content div[aria-label*='connect']"
+)
+
 ADD_NOTE_BUTTON = "button[aria-label='Add a note']"
 NOTE_TEXTAREA = "textarea[name='message'], textarea#custom-message"
 SEND_BUTTON = "button[aria-label='Send now'], button[aria-label='Send invitation']"
-PENDING_BUTTON = "button[aria-label*='Pending']"
-MESSAGE_BUTTON = "button[aria-label*='Message']"
+PENDING_BUTTON = "section.artdeco-card button[aria-label*='Pending']"
+MESSAGE_BUTTON = "section.artdeco-card button[aria-label*='Message']"
 
 
 class ConnectionManager:
@@ -39,11 +48,13 @@ class ConnectionManager:
         tracker: ConnectionTracker,
         note_composer: Optional[NoteComposer] = None,
         daily_limit: int = 25,
+        database_manager: Optional[DatabaseManager] = None,
     ):
         self.browser = browser
         self.tracker = tracker
         self.note_composer = note_composer
         self.daily_limit = daily_limit
+        self.database_manager = database_manager
     
     async def send_connection_request(
         self,
@@ -63,14 +74,14 @@ class ConnectionManager:
         logger.info(f"Sending connection request to {profile.name}")
         
         # Check daily limit
-        if self.tracker.get_today_count() >= self.daily_limit:
-            logger.warning("Daily connection limit reached")
-            return ConnectionRequest(
-                profile_url=profile.url,
-                profile_name=profile.name,
-                status=ConnectionStatus.ERROR,
-                error="Daily connection limit reached",
-            )
+        # if self.tracker.get_today_count() >= self.daily_limit:
+        #     logger.warning("Daily connection limit reached")
+        #     return ConnectionRequest(
+        #         profile_url=profile.url,
+        #         profile_name=profile.name,
+        #         status=ConnectionStatus.ERROR,
+        #         error="Daily connection limit reached",
+        #     )
         
         # Check if already sent
         if self.tracker.is_already_sent(profile.url):
@@ -90,10 +101,13 @@ class ConnectionManager:
             await self.browser.humanizer.random_delay(5000, 10000)
             logger.debug("Page load delay complete")
             
-            # Check connection status
-            logger.debug("Checking if connection is pending...")
+            # Check mapping status if we're already pending or connected
             if await self._is_pending():
                 logger.info(f"Connection pending with {profile.name}")
+                # Log to database for future exclusion
+                if self.database_manager:
+                    await self.database_manager.record_connection_request(profile.url, "PENDING")
+                
                 return ConnectionRequest(
                     profile_url=profile.url,
                     profile_name=profile.name,
@@ -104,6 +118,10 @@ class ConnectionManager:
             # Check if already connected (no Connect button and no Connect in dropdown)
             if await self._is_already_connected():
                 logger.info(f"Already connected with {profile.name}")
+                # Log to database for future exclusion
+                if self.database_manager:
+                    await self.database_manager.record_connection_request(profile.url, "ACCEPTED")
+                
                 return ConnectionRequest(
                     profile_url=profile.url,
                     profile_name=profile.name,
@@ -147,7 +165,7 @@ class ConnectionManager:
             else:
                 logger.warning("Send button may not have been clicked")
             
-            await self.browser.humanizer.random_delay(55000, 10000)
+            await self.browser.humanizer.random_delay(5000, 10000)
             
             # Record the connection
             request = ConnectionRequest(
@@ -159,6 +177,10 @@ class ConnectionManager:
             )
             
             self.tracker.record(request)
+            
+            # Log to database for future exclusion
+            if self.database_manager:
+                await self.database_manager.record_connection_request(profile.url, "SENT", sent_at=request.sent_at)
             
             logger.info(f"Connection request sent to {profile.name}")
             return request
@@ -174,58 +196,9 @@ class ConnectionManager:
     
     async def _click_connect_button(self) -> bool:
         """Click the Connect button, handling various UI states."""
-        logger.debug(f"Looking for Connect button with selector: {CONNECT_BUTTON}")
-        
-        # Try direct Connect button first
-        connect_exists = await self.browser.element_exists(CONNECT_BUTTON)
-        logger.debug(f"Direct Connect button exists: {connect_exists}")
-        
-        if connect_exists:
-            logger.info("Found direct Connect button, checking visibility...")
-            try:
-                # Get all matching elements to find a visible one
-                elements = await self.browser.get_all_elements(CONNECT_BUTTON)
-                logger.debug(f"Found {len(elements)} Connect button elements")
-                
-                # Try to find a visible element
-                visible_element = None
-                for i, elem in enumerate(elements):
-                    try:
-                        is_visible = await elem.is_visible()
-                        logger.debug(f"Connect button element {i} is visible: {is_visible}")
-                        if is_visible:
-                            visible_element = elem
-                            logger.info(f"Found visible Connect button at index {i}")
-                            break
-                    except Exception as e:
-                        logger.debug(f"Error checking visibility of element {i}: {e}")
-                
-                if visible_element:
-                    # Scroll to element if needed
-                    try:
-                        await visible_element.scroll_into_view_if_needed()
-                        await self.browser.humanizer.random_delay(5000, 10000)
-                    except Exception as e:
-                        logger.debug(f"Error scrolling to element: {e}")
-                    
-                    # Click the visible element directly
-                    await visible_element.click()
-                    logger.info("Direct Connect button clicked successfully")
-                    return True
-                else:
-                    logger.warning("No visible Connect button found, trying to click first element anyway...")
-                    # Fallback: try clicking the first element
-                    await self.browser.click(CONNECT_BUTTON)
-                    logger.info("Connect button clicked (fallback)")
-                    return True
-            except Exception as e:
-                logger.error(f"Failed to click direct Connect button: {e}")
-                import traceback
-                logger.debug(traceback.format_exc())
-                return False
         
         # Try clicking More button then Connect
-        logger.debug(f"Direct Connect button not found, checking for More button: {MORE_BUTTON}")
+        logger.debug(f"Checking for More button: {MORE_BUTTON}")
         more_exists = await self.browser.element_exists(MORE_BUTTON)
         logger.debug(f"More button exists: {more_exists}")
         
@@ -285,20 +258,73 @@ class ConnectionManager:
                             pass
                     
                     if visible_connect:
-                        await visible_connect.scroll_into_view_if_needed()
+                        logger.debug("Visible Connect option found, clicking...")
+                        await visible_connect.hover()
                         await self.browser.humanizer.random_delay(200, 500)
-                        await visible_connect.click()
-                        logger.debug("Connect in dropdown clicked successfully")
+                        # Use force click to bypass any interception by the dropdown overlay
+                        await visible_connect.click(force=True)
+                        logger.info("Connect in dropdown clicked successfully (visible element)")
                         return True
                     else:
-                        # Fallback
-                        await self.browser.click(CONNECT_IN_DROPDOWN)
-                        logger.debug("Connect in dropdown clicked (fallback)")
+                        # Fallback: try clicking the first matching element directly via page
+                        logger.debug("No visible element found, trying direct selector click...")
+                        await self.browser.page.click(CONNECT_IN_DROPDOWN, force=True, timeout=5000)
+                        logger.info("Connect in dropdown clicked (selector fallback)")
                         return True
                 else:
                     logger.warning("Connect option not found in dropdown after opening")
             except Exception as e:
                 logger.error(f"Error while trying to click Connect via dropdown: {e}")
+                import traceback
+                logger.debug(traceback.format_exc())
+                return False
+        
+        logger.debug(f"Looking for Connect button with selector: {CONNECT_BUTTON}")
+        
+        # Try direct Connect button first
+        connect_exists = await self.browser.element_exists(CONNECT_BUTTON)
+        logger.debug(f"Direct Connect button exists: {connect_exists}")
+        
+        if connect_exists:
+            logger.info("Found direct Connect button, checking visibility...")
+            try:
+                # Get all matching elements to find a visible one
+                elements = await self.browser.get_all_elements(CONNECT_BUTTON)
+                logger.debug(f"Found {len(elements)} Connect button elements")
+                
+                # Try to find a visible element
+                visible_element = None
+                for i, elem in enumerate(elements):
+                    try:
+                        is_visible = await elem.is_visible()
+                        logger.debug(f"Connect button element {i} is visible: {is_visible}")
+                        if is_visible:
+                            visible_element = elem
+                            logger.info(f"Found visible Connect button at index {i}")
+                            break
+                    except Exception as e:
+                        logger.debug(f"Error checking visibility of element {i}: {e}")
+                
+                if visible_element:
+                    # Scroll to element if needed
+                    try:
+                        await visible_element.scroll_into_view_if_needed()
+                        await self.browser.humanizer.random_delay(5000, 10000)
+                    except Exception as e:
+                        logger.debug(f"Error scrolling to element: {e}")
+                    
+                    # Click the visible element directly
+                    await visible_element.click()
+                    logger.info("Direct Connect button clicked successfully")
+                    return True
+                else:
+                    logger.warning("No visible Connect button found, trying to click first element anyway...")
+                    # Fallback: try clicking the first element
+                    await self.browser.click(CONNECT_BUTTON)
+                    logger.info("Connect button clicked (fallback)")
+                    return True
+            except Exception as e:
+                logger.error(f"Failed to click direct Connect button: {e}")
                 import traceback
                 logger.debug(traceback.format_exc())
                 return False

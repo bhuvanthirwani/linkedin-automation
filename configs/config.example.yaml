@@ -34,3 +34,23 @@ messaging:
 paths:
   cookies_dir: "./data/cookies"
   tracking_dir: "./data/tracking"
+
+database:
+  # PostgreSQL database configuration
+  # Can also be set via environment variables:
+  # DB_POSTGRESDB_HOST, DB_POSTGRESDB_PORT, DB_POSTGRESDB_DATABASE,
+  # DB_POSTGRESDB_USER, DB_POSTGRESDB_PASSWORD, DB_POSTGRESDB_SCHEMA
+  db_type: "postgresdb"
+  host: ""
+  port: 6543
+  database: ""
+  user: ""
+  password: ""
+  schema: "public"
+  table_name: "linkedin_db_candidates"
+  url_column: "linkedin_url"
+  # Optional: Exclude URLs that already exist in another table
+  # When fetching from linkedin_db_raw_linkedin_ingest, automatically excludes
+  # URLs that exist in linkedin_db_connection_requests
+  exclude_table: "linkedin_db_connection_requests"  # Set to null/empty to disable
+  exclude_url_column: "linkedin_url"  # Column name in exclude_table containing URLs

@@ -71,6 +71,51 @@ class PathsConfig(BaseModel):
     tracking_dir: str = "./data/tracking"
 
 
+class DatabaseConfig(BaseModel):
+    """PostgreSQL database configuration."""
+    db_type: str = "postgresdb"
+    host: str = ""
+    port: int = 5432
+    database: str = ""
+    user: str = ""
+    password: str = ""
+    schema: str = "public"
+    table_name: str = "linkedin_db_candidates"
+    url_column: str = "linkedin_url"
+    exclude_table: Optional[str] = None
+    exclude_url_column: Optional[str] = None
+    
+    @field_validator('host', mode='before')
+    @classmethod
+    def get_host(cls, v):
+        return v or os.getenv('DB_POSTGRESDB_HOST', '')
+    
+    @field_validator('port', mode='before')
+    @classmethod
+    def get_port(cls, v):
+        return int(v) if v else int(os.getenv('DB_POSTGRESDB_PORT', '5432'))
+    
+    @field_validator('database', mode='before')
+    @classmethod
+    def get_database(cls, v):
+        return v or os.getenv('DB_POSTGRESDB_DATABASE', '')
+    
+    @field_validator('user', mode='before')
+    @classmethod
+    def get_user(cls, v):
+        return v or os.getenv('DB_POSTGRESDB_USER', '')
+    
+    @field_validator('password', mode='before')
+    @classmethod
+    def get_password(cls, v):
+        return v or os.getenv('DB_POSTGRESDB_PASSWORD', '')
+    
+    @field_validator('schema', mode='before')
+    @classmethod
+    def get_schema(cls, v):
+        return v or os.getenv('DB_POSTGRESDB_SCHEMA', 'public')
+
+
 class Config(BaseModel):
     """Main configuration class."""
     linkedin: LinkedInConfig = Field(default_factory=LinkedInConfig)
@@ -79,6 +124,7 @@ class Config(BaseModel):
     search: SearchConfig = Field(default_factory=SearchConfig)
     messaging: MessagingConfig = Field(default_factory=MessagingConfig)
     paths: PathsConfig = Field(default_factory=PathsConfig)
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     
     def validate_credentials(self) -> bool:
         """Check if LinkedIn credentials are set."""

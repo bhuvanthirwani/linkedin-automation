@@ -8,6 +8,7 @@ Automating LinkedIn violates their Terms of Service and may result in account ba
 ## Features
 - 🔐 **Authentication**: Login with credentials, session persistence, checkpoint detection
 - 🔍 **User Search**: Search by job title, company, location, keywords with pagination
+- 🗄️ **Database Integration**: Fetch LinkedIn URLs from PostgreSQL database and send connection requests
 - 🤝 **Connection Management**: Send personalized connection requests with daily limits
 - 💬 **Follow-up Messaging**: Automated follow-up messages with template support
 - 🛡️ **Anti-Detection**: Human-like behavior patterns, fingerprint masking
@@ -47,6 +48,18 @@ set LINKEDIN_PASSWORD=your_password
 
 Or edit `configs/config.yaml` directly.
 
+3. (Optional) For database mode, set database credentials:
+```bash
+set DB_POSTGRESDB_HOST=your_host
+set DB_POSTGRESDB_PORT=5432
+set DB_POSTGRESDB_DATABASE=your_database
+set DB_POSTGRESDB_USER=your_user
+set DB_POSTGRESDB_PASSWORD=your_password
+set DB_POSTGRESDB_SCHEMA=public
+```
+
+Or configure in `configs/config.yaml` under the `database` section.
+
 ## Usage
 
 ```bash
@@ -58,6 +71,15 @@ python -m src.main --mode search --keywords "Software Engineer" --location "San 
 
 # Follow-up messaging mode
 python -m src.main --mode followup
+
+# Database mode - fetch URLs from database and send connection requests
+python -m src.main --mode database --max-connections 10
+
+# Database mode with custom table and WHERE clause
+python -m src.main --mode database --table linkedin_db_candidate_queue --where "status = 'pending'"
+
+# Database mode - fetch from raw_linkedin_ingest (automatically excludes connection_requests)
+python -m src.main --mode database --table linkedin_db_raw_linkedin_ingest --max-connections 10
 
 # Dry run (no actual actions)
 python -m src.main --dry-run
@@ -89,6 +111,8 @@ linkedin-automation/
 │   │   ├── followup.py      # Follow-up messages
 │   │   ├── template.py      # Template engine
 │   │   └── tracker.py       # Message tracking
+│   ├── database/
+│   │   └── db.py            # Database connection and queries
 │   └── utils/
 │       ├── config.py        # Configuration
 │       └── models.py        # Data models
