@@ -64,25 +64,32 @@ Or configure in `configs/config.yaml` under the `database` section.
 
 ```bash
 # Run the bot
-python -m src.main --config configs/config.yaml
+python run.py --config configs/config.yaml
 
-# Search and connect mode
-python -m src.main --mode search --keywords "Software Engineer" --location "San Francisco"
+# 1. Scrapping Mode
+# Scrapes profiles from search results to database
+# --start-page: page to start from (e.g. 1)
+# --pages: number of pages to scrape (e.g. 10)
+# --max-connections: LIMIT number of profiles to save (stops early if reached)
+python run.py --mode Scrapping --keywords "Software Engineer" --location "Remote" --start-page 1 --pages 10 --max-connections 30
 
-# Follow-up messaging mode
-python -m src.main --mode followup
+# 2. Filtering & Sending Mode
+# Checks activity of scraped profiles and sends requests to active ones
+# --max-connections: TARGET number of requests to send (stops when sent count is reached)
+python run.py --mode Filtering --max-connections 20
+
+# 3. Send Requests Mode (Manual/Legacy)
+# Sends requests to profiles already marked as active
+python run.py --mode Send_Requests --max-connections 10
 
 # Database mode - fetch URLs from database and send connection requests
-python -m src.main --mode database --max-connections 10
+python run.py --mode database --max-connections 10
 
-# Database mode with custom table and WHERE clause
-python -m src.main --mode database --table linkedin_db_candidate_queue --where "status = 'pending'"
-
-# Database mode - fetch from raw_linkedin_ingest (automatically excludes connection_requests)
-python -m src.main --mode database --table linkedin_db_raw_linkedin_ingest --max-connections 10
+# Search and connect mode (Legacy)
+python run.py --mode search --keywords "Software Engineer" --location "San Francisco"
 
 # Dry run (no actual actions)
-python -m src.main --dry-run
+python run.py --dry-run
 ```
 
 ## Project Structure

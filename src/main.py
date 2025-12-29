@@ -25,7 +25,12 @@ from .messaging.followup import FollowUpMessenger
 from .messaging.template import TemplateEngine
 from .messaging.tracker import MessageTracker
 from .utils.models import SearchCriteria
+from .messaging.tracker import MessageTracker
+from .utils.models import SearchCriteria
 from .database.db import DatabaseManager
+from .features.network_scraper import NetworkScraper
+from .features.activity_filter import ActivityFilter
+from .features.request_sender import RequestSender
 
 
 # Configure logging
@@ -61,6 +66,11 @@ class LinkedInBot:
         # Trackers
         self.connection_tracker: ConnectionTracker = None
         self.message_tracker: MessageTracker = None
+
+        # Features
+        self.network_scraper: NetworkScraper = None
+        self.activity_filter: ActivityFilter = None
+        self.request_sender: RequestSender = None
     
     async def start(self) -> None:
         """Initialize and start the bot."""
@@ -129,6 +139,12 @@ class LinkedInBot:
             self.browser,
             self.config.search.max_pages,
         )
+
+        # Initialize Features
+        self.network_scraper = NetworkScraper(self.browser, self.database_manager)
+        self.activity_filter = ActivityFilter(self.browser, self.database_manager, self.connection_manager)
+        # RequestSender needs connection_manager
+        self.request_sender = RequestSender(self.browser, self.database_manager, self.connection_manager)
         
         logger.info("LinkedIn Bot started successfully")
     
@@ -320,6 +336,26 @@ class LinkedInBot:
         
         logger.info("LinkedIn Bot stopped")
 
+    async def run_scrapping(self, keywords: str, location: str, start_page: int, pages: int, limit: int) -> None:
+        """Run the Scrapping mode."""
+        if not self.network_scraper:
+            raise RuntimeError("NetworkScraper not initialized")
+        await self.network_scraper.execute(keywords, location, start_page, pages, limit)
+
+    async def run_filtering(self, target_connections: int) -> None:
+        """Run the Filtering mode (which includes sending)."""
+        if not self.activity_filter:
+            raise RuntimeError("ActivityFilter not initialized")
+        await self.activity_filter.execute(target_connections)
+
+    async def run_sending(self, limit: int) -> None:
+        """Run the Send_Requests mode."""
+        if not self.request_sender:
+            raise RuntimeError("RequestSender not initialized")
+        await self.request_sender.execute(limit)
+
+
+
 
 async def main():
     """Main entry point."""
@@ -335,9 +371,9 @@ async def main():
     parser.add_argument(
         "--mode",
         type=str,
-        choices=["search", "followup", "both", "database"],
+        choices=["search", "followup", "both", "database", "Scrapping", "Filtering", "Send_Requests"],
         default="both",
-        help="Operation mode (search, followup, both, or database)",
+        help="Operation mode (search, followup, both, database, Scrapping, Filtering, Send_Requests)",
     )
     parser.add_argument(
         "--table",
@@ -391,6 +427,19 @@ async def main():
         "--dry-run",
         action="store_true",
         help="Dry run mode (no actual actions)",
+
+    )
+    parser.add_argument(
+        "--start-page",
+        type=int,
+        default=1,
+        help="Start page for LinkedIn search results (Scrapping mode)",
+    )
+    parser.add_argument(
+        "--pages",
+        type=int,
+        default=10,
+        help="Number of pages to scrape (Scrapping mode)",
     )
     
     args = parser.parse_args()
@@ -428,6 +477,27 @@ async def main():
                     where_clause=args.where,
                 )
                 logger.info(f"Database Connect Results: {result}")
+        
+        elif args.mode == "Scrapping":
+            if args.dry_run:
+                logger.info("[DRY RUN] Would run Scrapping")
+            else:
+                # Scrapping uses page counts AND profile limits
+                await bot.run_scrapping(args.keywords, args.location, args.start_page, args.pages, args.max_connections)
+        
+        elif args.mode == "Filtering":
+            if args.dry_run:
+                logger.info("[DRY RUN] Would run Filtering")
+            else:
+                # Filtering runs until max_connections requests are sent (or explicit limit)
+                await bot.run_filtering(args.max_connections)
+        
+        elif args.mode == "Send_Requests":
+            if args.dry_run:
+                logger.info("[DRY RUN] Would run Send_Requests")
+            else:
+                await bot.run_sending(args.max_connections)
+
         elif args.mode in ["search", "both"]:
             if args.dry_run:
                 logger.info("[DRY RUN] Would search and connect")

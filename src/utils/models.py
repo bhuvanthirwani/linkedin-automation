@@ -71,6 +71,7 @@ class SearchCriteria(BaseModel):
     industry: str = ""
     school: str = ""
     network: str = "\"S\""
+    page: int = 1
     max_results: int = 100
 
 

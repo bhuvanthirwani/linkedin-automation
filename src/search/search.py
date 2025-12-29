@@ -22,7 +22,7 @@ class UserSearch:
     
     BASE_SEARCH_URL = "https://www.linkedin.com/search/results/people/"
     
-    def __init__(self, browser: BrowserEngine, max_pages: int = 10):
+    def __init__(self, browser: BrowserEngine, max_pages: int = 30):
         self.browser = browser
         self.max_pages = max_pages
         self.parser = ProfileParser(browser)
@@ -56,7 +56,8 @@ class UserSearch:
         # Process pages
         while pages_scraped < self.max_pages:
             pages_scraped += 1
-            logger.info(f"Processing page {pages_scraped}")
+            current_page_num = criteria.page + pages_scraped - 1
+            logger.info(f"Processing page {current_page_num} (Iteration {pages_scraped})")
             
             # Scroll to load all results on the page
             await self._scroll_to_load_results()
@@ -111,6 +112,7 @@ class UserSearch:
             params["keywords"] = criteria.keywords
 
         params["network"] = criteria.network
+        params["page"] = criteria.page
         # LinkedIn uses specific filter parameters
         filters = []
         

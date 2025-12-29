@@ -58,6 +58,9 @@ class DatabaseManager:
                 statement_cache_size=0,
             )
             logger.info("Database connection pool created successfully")
+            
+            # Initialize schema for network data
+            await self.create_network_data_table()
         except Exception as e:
             logger.error(f"Failed to create database connection pool: {e}")
             raise
@@ -432,6 +435,172 @@ class DatabaseManager:
             return True
         except Exception as e:
             logger.error(f"Failed to record connection request: {e}")
+            return False
+
+    async def create_network_data_table(self) -> None:
+        """Create the linkedin_db_network_data table if it doesn't exist."""
+        if not self.pool:
+             return
+        
+        query = """
+        CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+        CREATE TABLE IF NOT EXISTS public.linkedin_db_network_data (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            linkedin_url TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            first_name TEXT,
+            last_name TEXT,
+            keywords TEXT[],
+            location TEXT,
+            recent_activity_raw TEXT,
+            recent_activity_value INTEGER,
+            recent_activity_unit TEXT CHECK (recent_activity_unit IN ('h', 'd', 'w', 'mo')),
+            recent_activity_minutes INTEGER,
+            scrape_status TEXT CHECK (scrape_status IN ('not_scraped', 'scraped', 'failed')) DEFAULT 'not_scraped',
+            request_status TEXT CHECK (request_status IN ('not_sent', 'pending', 'sent', 'skipped', 'failed', 'already_connected')) DEFAULT 'not_sent',
+            scraped_at TIMESTAMPTZ,
+            request_sent_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ DEFAULT now(),
+            updated_at TIMESTAMPTZ DEFAULT now()
+        );
+        """
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(query)
+            logger.info("Ensured linkedin_db_network_data table exists")
+        except Exception as e:
+            logger.error(f"Failed to create network data table: {e}")
+
+    async def upsert_network_profile(self, profile_data: Dict[str, Any]) -> bool:
+        """Insert or update a profile in network data table."""
+        if not self.pool:
+            return False
+        
+        query = """
+        INSERT INTO public.linkedin_db_network_data (
+            linkedin_url, name, first_name, last_name, keywords, location, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+        ON CONFLICT (linkedin_url) DO UPDATE SET
+            name = EXCLUDED.name,
+            first_name = COALESCE(EXCLUDED.first_name, public.linkedin_db_network_data.first_name),
+            last_name = COALESCE(EXCLUDED.last_name, public.linkedin_db_network_data.last_name),
+            keywords = EXCLUDED.keywords, 
+            location = COALESCE(EXCLUDED.location, public.linkedin_db_network_data.location),
+            updated_at = NOW()
+        """
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(
+                    query,
+                    profile_data.get('linkedin_url'),
+                    profile_data.get('name'),
+                    profile_data.get('first_name'),
+                    profile_data.get('last_name'),
+                    profile_data.get('keywords', []),
+                    profile_data.get('location')
+                )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to upsert network profile: {e}")
+            return False
+
+    async def get_profiles_for_filtering(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Fetch profiles that need activity scraping."""
+        if not self.pool:
+            return []
+        
+        query = """
+        SELECT linkedin_url, name 
+        FROM public.linkedin_db_network_data
+        WHERE scrape_status = 'not_scraped'
+        ORDER BY created_at ASC
+        LIMIT $1
+        """
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(query, limit)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Failed to fetch profiles for filtering: {e}")
+            return []
+
+    async def update_network_activity(self, url: str, activity_data: Dict[str, Any]) -> bool:
+        """Update activity data for a profile."""
+        if not self.pool:
+            return False
+            
+        query = """
+        UPDATE public.linkedin_db_network_data
+        SET
+            recent_activity_raw = $2,
+            recent_activity_value = $3,
+            recent_activity_unit = $4,
+            recent_activity_minutes = $5,
+            scrape_status = $6,
+            scraped_at = NOW(),
+            updated_at = NOW()
+        WHERE linkedin_url = $1
+        """
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(
+                    query,
+                    url,
+                    activity_data.get('raw'),
+                    activity_data.get('value'),
+                    activity_data.get('unit'),
+                    activity_data.get('minutes'),
+                    activity_data.get('status', 'scraped')
+                )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update activity for {url}: {e}")
+            return False
+
+    async def get_profiles_for_sending(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Fetch profiles eligible for connection requests (recent activity < 1 week)."""
+        if not self.pool:
+            return []
+            
+        # 1 week = 7 * 24 * 60 = 10080 minutes
+        query = """
+        SELECT linkedin_url, name, first_name, last_name, recent_activity_minutes
+        FROM public.linkedin_db_network_data
+        WHERE 
+            scrape_status = 'scraped' AND
+            request_status = 'not_sent' AND
+            recent_activity_minutes IS NOT NULL AND
+            recent_activity_minutes <= 10080
+        ORDER BY recent_activity_minutes ASC
+        LIMIT $1
+        """
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(query, limit)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Failed to fetch profiles for sending: {e}")
+            return []
+
+    async def update_request_status(self, url: str, status: str) -> bool:
+        """Update request status."""
+        if not self.pool:
+            return False
+            
+        query = """
+        UPDATE public.linkedin_db_network_data
+        SET
+            request_status = $2,
+            request_sent_at = CASE WHEN $2 = 'sent' THEN NOW() ELSE request_sent_at END,
+            updated_at = NOW()
+        WHERE linkedin_url = $1
+        """
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(query, url, status)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update request status for {url}: {e}")
             return False
 
     async def delete_from_raw_ingest(self, url: str) -> bool:
