@@ -27,7 +27,7 @@ class NetworkScraper:
         
         criteria = SearchCriteria(
             keywords=search_kw,
-            locations=[location] if location else [],  # Ensure list for locations
+            location=location if location else "",
             page=start_page,
             max_results=limit
         )
@@ -35,32 +35,37 @@ class NetworkScraper:
         # update searcher max_pages
         self.searcher.max_pages = max_pages
         
-        # Perform search (this navigates and scrolls)
-        results = await self.searcher.search(criteria)
-        
-        logger.info(f"Found {len(results.profiles)} profiles. Saving to database...")
-        
         saved_count = 0
-        for profile in results.profiles:
-            try:
-                # Basic name parsing
-                parts = profile.name.strip().split(' ') if profile.name else []
-                first_name = parts[0] if parts else ""
-                last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
-                
-                data = {
-                    "linkedin_url": profile.url,
-                    "name": profile.name,
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "keywords": [search_kw] if search_kw else [],
-                    "location": location if location else profile.location
-                }
-                
-                if await self.db.upsert_network_profile(data):
-                    saved_count += 1
-            except Exception as e:
-                logger.error(f"Error saving profile {profile.url}: {e}")
-                
-        logger.info(f"Successfully saved {saved_count} profiles to network data.")
+
+        async def save_batch(profiles: List):
+            nonlocal saved_count
+            batch_saved = 0
+            for profile in profiles:
+                try:
+                    # Basic name parsing
+                    parts = profile.name.strip().split(' ') if profile.name else []
+                    first_name = parts[0] if parts else ""
+                    last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+                    
+                    data = {
+                        "linkedin_url": profile.url,
+                        "name": profile.name,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "keywords": [search_kw] if search_kw else [],
+                        "location": location if location else profile.location
+                    }
+                    
+                    if await self.db.upsert_network_profile(data):
+                        batch_saved += 1
+                except Exception as e:
+                    logger.error(f"Error saving profile {profile.url}: {e}")
+            
+            saved_count += batch_saved
+            logger.info(f"Saved {batch_saved} profiles from this page. Total saved so far: {saved_count}")
+        
+        # Perform search (this navigates and scrolls) with real-time saving
+        results = await self.searcher.search(criteria, on_page_scraped=save_batch)
+        
+        logger.info(f"Scraping completed. Successfully saved {saved_count} profiles to network data.")
         return saved_count

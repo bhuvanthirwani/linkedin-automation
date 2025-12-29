@@ -29,12 +29,17 @@ class UserSearch:
         self.pagination = PaginationHandler(browser)
         self._seen_urls: set = set()
     
-    async def search(self, criteria: SearchCriteria) -> SearchResult:
+    from typing import List, Optional, Callable, Awaitable
+
+    # ... (Update imports if needed, but I'll assume they are at top)
+
+    async def search(self, criteria: SearchCriteria, on_page_scraped: Optional[Callable[[List[Profile]], Awaitable[None]]] = None) -> SearchResult:
         """
         Search for profiles matching the given criteria.
         
         Args:
             criteria: Search criteria to use.
+            on_page_scraped: Optional async callback to invoke with new profiles from each page.
             
         Returns:
             SearchResult with found profiles.
@@ -75,6 +80,9 @@ class UserSearch:
             profiles.extend(new_profiles)
             logger.info(f"Found {len(new_profiles)} new profiles on page {pages_scraped}")
             
+            if on_page_scraped and new_profiles:
+                await on_page_scraped(new_profiles)
+            
             # Check if we've reached max results
             if criteria.max_results and len(profiles) >= criteria.max_results:
                 profiles = profiles[:criteria.max_results]
@@ -88,7 +96,7 @@ class UserSearch:
             
             # Go to next page
             await self.pagination.go_to_next_page()
-            await self.browser.humanizer.random_delay(5000, 10000)
+            await self.browser.humanizer.random_delay(500, 1000)
         
         duration = (datetime.now() - start_time).total_seconds()
         

@@ -442,6 +442,7 @@ class DatabaseManager:
         if not self.pool:
              return
         
+        # 1. Base Table Creation
         query = """
         CREATE EXTENSION IF NOT EXISTS "pgcrypto";
         CREATE TABLE IF NOT EXISTS public.linkedin_db_network_data (
@@ -464,9 +465,31 @@ class DatabaseManager:
             updated_at TIMESTAMPTZ DEFAULT now()
         );
         """
+        
+        # 2. Self-Healing: Remove Duplicates & Ensure Unique Index
+        # This handles cases where the table exists but lacks the UNIQUE constraint, causing ON CONFLICT failures.
+        cleanup_query = """
+        DELETE FROM public.linkedin_db_network_data a USING public.linkedin_db_network_data b 
+        WHERE a.id < b.id AND a.linkedin_url = b.linkedin_url;
+        """
+        
+        index_query = """
+        CREATE UNIQUE INDEX IF NOT EXISTS linkedin_db_network_data_linkedin_url_idx 
+        ON public.linkedin_db_network_data (linkedin_url);
+        """
+
         try:
             async with self.pool.acquire() as conn:
                 await conn.execute(query)
+                
+                # Run self-healing
+                try:
+                    await conn.execute(cleanup_query)
+                    await conn.execute(index_query)
+                    logger.debug("Ensured unique index and removed duplicates for linkedin_db_network_data")
+                except Exception as e:
+                    logger.warning(f"Metadata maintenance (cleanup/index) failed (non-critical if table new): {e}")
+
             logger.info("Ensured linkedin_db_network_data table exists")
         except Exception as e:
             logger.error(f"Failed to create network data table: {e}")
