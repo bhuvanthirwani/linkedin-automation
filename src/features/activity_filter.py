@@ -15,6 +15,7 @@ HEADER_TEXT_REGEX = re.compile(r"Activity", re.IGNORECASE)
 POSTS_BUTTON_SELECTOR = "button:has(span.artdeco-pill__text:text-is('Posts'))" # Simplified playwright selector
 COMMENTS_BUTTON_SELECTOR = "button:has(span.artdeco-pill__text:text-is('Comments'))"
 SUB_DESCRIPTION_SELECTOR = ".update-components-actor__sub-description" 
+MINI_UPDATE_SUB_DESCRIPTION_SELECTOR = ".feed-mini-update-contextual-description__text"
 
 class ActivityFilter:
     def __init__(self, browser: BrowserEngine, db: DatabaseManager, connection_manager: ConnectionManager):
@@ -54,15 +55,15 @@ class ActivityFilter:
                 
                 try:
                     # 1. Navigate
-                    logger.debug(f"Navigating to profile: {url}")
+                    logger.info(f"Navigating to profile: {url}")
                     await self.browser.navigate(url)
-                    logger.debug("Waiting after navigation...")
+                    logger.info("Waiting after navigation...")
                     await self.browser.humanizer.random_delay(3000, 5000)
                     
                     # 2. Find Activity Section
-                    logger.debug("Scrolling to find activity section...")
+                    logger.info("Scrolling to find activity section...")
                     await self.browser.scroll(amount=600)
-                    logger.debug("Waiting after scroll...")
+                    logger.info("Waiting after scroll...")
                     await self.browser.humanizer.random_delay(1000, 2000)
                     
                     activity_section = self.browser.page.locator(ACTIVITY_SECTION_SELECTOR).filter(
@@ -70,7 +71,7 @@ class ActivityFilter:
                     )
                     
                     section_count = await activity_section.count()
-                    logger.debug(f"Activity section found count: {section_count}")
+                    logger.info(f"Activity section found count: {section_count}")
                     
                     if section_count == 0:
                         logger.warning(f"No Activity section found for {url}")
@@ -87,30 +88,30 @@ class ActivityFilter:
                     
                     has_posts = await posts_btn.count() > 0
                     has_comments = await comments_btn.count() > 0
-                    logger.debug(f"Activity tabs present - Posts: {has_posts}, Comments: {has_comments}")
+                    logger.info(f"Activity tabs present - Posts: {has_posts}, Comments: {has_comments}")
                     
                     views_to_check = []
                     if has_posts: views_to_check.append(("Posts", posts_btn))
                     if has_comments: views_to_check.append(("Comments", comments_btn))
                     
                     if not views_to_check:
-                         logger.debug("No Posts/Comments pills, checking default view.")
+                         logger.info("No Posts/Comments pills, checking default view.")
                          recency_candidates.extend(await self._scrape_current_view_times(activity_section))
                     else:
                         for label, btn in views_to_check:
-                            logger.debug(f"Clicking {label} filter...")
+                            logger.info(f"Clicking {label} filter...")
                             try:
                                 await btn.first.click()
-                                logger.debug(f"Waiting for {label} content to load...")
+                                logger.info(f"Waiting for {label} content to load...")
                                 await self.browser.humanizer.random_delay(2000, 4000)
                                 timestamps = await self._scrape_current_view_times(activity_section)
-                                logger.debug(f"Found timestamps in {label}: {timestamps}")
+                                logger.info(f"Found timestamps in {label}: {timestamps}")
                                 recency_candidates.extend(timestamps)
                             except Exception as e:
                                 logger.warning(f"Failed to click {label} button: {e}")
 
                     # 4. Determine best recency
-                    logger.debug(f"All recency candidates: {recency_candidates}")
+                    logger.info(f"All recency candidates: {recency_candidates}")
                     best_recency = { "raw": None, "value": None, "unit": None, "minutes": None, "status": "scraped" }
                     valid_candidates = [r for r in recency_candidates if r.get('minutes') is not None]
                     
@@ -144,10 +145,10 @@ class ActivityFilter:
                         if profile.get('last_name'): profile_obj.last_name = profile['last_name']
                         
                         try:
-                            logger.debug(f"Initiating connection request to {url}")
+                            logger.info(f"Initiating connection request to {url}")
                             await self.db.update_request_status(url, 'pending')
                             result = await self.connection_manager.send_connection_request(profile_obj)
-                            logger.debug(f"Connection request result: {result}")
+                            logger.info(f"Connection request result: {result}")
                             
                             db_status = 'failed'
                             if result.error:
@@ -171,14 +172,14 @@ class ActivityFilter:
                             if db_status == 'sent':
                                 requests_sent_session += 1
                                 logger.info(f"Request sent! Total session: {requests_sent_session}")
-                                logger.debug("Waiting after sending request...")
+                                logger.info("Waiting after sending request...")
                                 await self.browser.humanizer.random_delay(5000, 10000)
                                 
                         except Exception as e:
                             logger.error(f"Error sending request to {url}: {e}")
                             await self.db.update_request_status(url, 'failed')
                     else:
-                        logger.debug(f"Profile {url} not eligible for connection (minutes={recency.get('minutes')})")
+                        logger.info(f"Profile {url} not eligible for connection (minutes={recency.get('minutes')})")
                     
                     processed_in_batch += 1
                     
@@ -198,17 +199,33 @@ class ActivityFilter:
         try:
             # We specifically look for the sub-description element which contains "1w • Edited" etc.
             # Using the constant selector
-            elements = activity_section.locator(SUB_DESCRIPTION_SELECTOR)
-            count = await elements.count()
-            logger.debug(f"Found {count} timestamp elements in current view.")
+            # Check both standard updates and mini updates (comments)
+            elements_std = activity_section.locator(SUB_DESCRIPTION_SELECTOR)
+            elements_mini = activity_section.locator(MINI_UPDATE_SUB_DESCRIPTION_SELECTOR)
             
-            for i in range(count):
-                text = await elements.nth(i).inner_text()
-                logger.debug(f"Processing timestamp text: '{text}'")
+            count_std = await elements_std.count()
+            count_mini = await elements_mini.count()
+            
+            logger.info(f"Found {count_std} standard timestamps and {count_mini} mini timestamps in current view.")
+            
+            # Process standard
+            for i in range(count_std):
+                text = await elements_std.nth(i).inner_text()
+                logger.info(f"Processing standard timestamp text: '{text}'")
                 parsed = self._parse_recency_from_text(text)
                 if parsed['minutes'] is not None:
-                    logger.debug(f"Parsed valid recency: {parsed}")
+                    logger.info(f"Parsed valid recency: {parsed}")
                 candidates.append(parsed)
+
+            # Process mini
+            for i in range(count_mini):
+                text = await elements_mini.nth(i).inner_text()
+                logger.info(f"Processing mini timestamp text: '{text}'")
+                parsed = self._parse_recency_from_text(text)
+                if parsed['minutes'] is not None:
+                    logger.info(f"Parsed valid recency: {parsed}")
+                candidates.append(parsed)
+                
         except Exception as e:
              logger.warning(f"Error extracting times from view: {e}")
         return candidates
@@ -224,7 +241,7 @@ class ActivityFilter:
         
         if match:
             val_str, unit = match.groups()
-            logger.debug(f"Regex match found: value={val_str}, unit={unit}")
+            logger.info(f"Regex match found: value={val_str}, unit={unit}")
             
             # Normalize unit
             unit = unit.lower()

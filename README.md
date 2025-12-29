@@ -71,7 +71,7 @@ python run.py --config configs/config.yaml
 # --start-page: page to start from (e.g. 1)
 # --pages: number of pages to scrape (e.g. 10)
 # --max-connections: LIMIT number of profiles to save (stops early if reached)
-python run.py --mode Scrapping --keywords "Software Engineer" --location "Remote" --start-page 1 --pages 10 --max-connections 30
+python run.py --mode Scrapping --keywords "Senior Software Engineer" --location "90000084" --start-page 22 --pages 10 --max-connections 30
 
 # 2. Filtering & Sending Mode
 # Checks activity of scraped profiles and sends requests to active ones
