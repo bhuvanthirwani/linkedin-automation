@@ -25,7 +25,7 @@ search:
   skip_duplicates: true
 
 messaging:
-  connection_note_template: "Hi there, I loved your profile! I saw the SE opening at your company. I recently interned at Salesforce, developed AI-powered data pipelines with scalable backend systems. Could you please refer me?"
+  connection_note_template: "Hi {first_name}, I loved your profile! I saw the Software Engineer opening at your organization & would love to apply. I recently interned at Salesforce, developing full-stack AI-powered applications that combined scalable backend systems with data pipelines. Could you please refer me?"
   max_note_length: 300
   follow_up_templates:
     - "Hi {first_name}, thanks for connecting! I'd love to learn more about your experience at {company}."

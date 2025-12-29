@@ -87,14 +87,14 @@ class ConnectionManager:
         #     )
         
         # Check if already sent
-        if self.tracker.is_already_sent(profile.url):
-            logger.info(f"Connection already sent to {profile.name}")
-            return ConnectionRequest(
-                profile_url=profile.url,
-                profile_name=profile.name,
-                status=ConnectionStatus.PENDING,
-                error="Connection already sent",
-            )
+        # if self.tracker.is_already_sent(profile.url):
+        #     logger.info(f"Connection already sent to {profile.name}")
+        #     return ConnectionRequest(
+        #         profile_url=profile.url,
+        #         profile_name=profile.name,
+        #         status=ConnectionStatus.PENDING,
+        #         error="Connection already sent",
+        #     )
         
         try:
             # Navigate to profile
