@@ -535,7 +535,7 @@ class DatabaseManager:
         query = """
         SELECT linkedin_url, name 
         FROM public.linkedin_db_network_data
-        WHERE scrape_status = 'not_scraped'
+        WHERE scrape_status = 'not_scraped' or scrape_status = 'failed'
         ORDER BY created_at ASC
         LIMIT $1
         """
