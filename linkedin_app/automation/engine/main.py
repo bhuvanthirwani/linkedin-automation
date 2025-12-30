@@ -238,6 +238,11 @@ class LinkedInBot:
 
     def run_sales_nav_connection(self, url: str, end_page: int, limit: int, message: Optional[str] = None) -> None:
         """Run the Sales Navigator connection automation."""
+        # Fallback to default template if no message provided
+        if not message:
+            message = self.config.messaging.connection_note_template
+            logger.info("No message provided, using default template from config.")
+            
         mgr = SalesNavConnectionManager(self.browser, self.connection_tracker, self.database_manager)
         mgr.run_automation(url, end_page, limit, message)
 

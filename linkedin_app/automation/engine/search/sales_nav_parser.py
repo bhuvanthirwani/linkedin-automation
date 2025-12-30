@@ -12,12 +12,15 @@ from ..browser.browser import BrowserEngine
 from ..utils.models import Profile
 
 
-# Selectors for Sales Navigator search results
-SEARCH_RESULT_ITEM = "li.search-results__result-item"
-PROFILE_LINK = "a.result-lockup__full-name-link"
-PROFILE_NAME = "a.result-lockup__full-name-link"
-PROFILE_HEADLINE = "div.result-lockup__headline"
-PROFILE_LOCATION = "p.result-lockup__address"
+# Selectors for Sales Navigator search results (Updated based on user HTML)
+RESULTS_CONTAINER = "ol.artdeco-list"
+SEARCH_RESULT_ITEM = "li.artdeco-list__item"
+PROFILE_LINK = "a[data-control-name='view_lead_panel_via_search_lead_name']"
+PROFILE_NAME = "span[data-anonymize='person-name']"
+PROFILE_HEADLINE = "span[data-anonymize='title']"
+PROFILE_LOCATION = "span[data-anonymize='location']"
+PROFILE_COMPANY = "a[data-anonymize='company-name']"
+LEAD_INDICATOR = "div[data-x-search-result='LEAD']"
 
 
 class SalesNavParser:
@@ -62,6 +65,11 @@ class SalesNavParser:
     def _parse_result_item(self, item) -> Optional[Profile]:
         """Parse a single Sales Navigator search result item."""
         try:
+            # First, verify if this is actually a lead result
+            if not item.query_selector(LEAD_INDICATOR):
+                logger.debug("Item does not have a lead indicator, skipping.")
+                return None
+
             # Get profile URL
             link_element = item.query_selector(PROFILE_LINK)
             if not link_element:
@@ -74,8 +82,12 @@ class SalesNavParser:
             # Clean URL
             url = self._clean_profile_url(url)
             
-            # Get name
-            name = link_element.text_content() or ""
+            # Get name - usually inside the link in a span
+            name_element = link_element.query_selector(PROFILE_NAME)
+            if name_element:
+                name = name_element.text_content() or ""
+            else:
+                name = link_element.text_content() or ""
             name = name.strip()
             
             # Get headline
@@ -92,10 +104,18 @@ class SalesNavParser:
                 location = location_element.text_content() or ""
                 location = location.strip()
             
-            # Extract first name and company from headline
+            # Get company
+            company = ""
+            company_element = item.query_selector(PROFILE_COMPANY)
+            if company_element:
+                company = company_element.text_content() or ""
+                company = company.strip()
+            
+            # Extract first name
             first_name, last_name = self._split_name(name)
-            company = self._extract_company(headline)
-            title = self._extract_title(headline)
+            
+            # If headline is missing, use title if available
+            title = headline
             
             return Profile(
                 url=url,

@@ -304,14 +304,40 @@ class DatabaseManager:
             return False
             
         query = f"""
-        INSERT INTO public.automation_dailystats (date, {column})
-        VALUES (%s, %s)
+        INSERT INTO public.automation_dailystats (
+            date, connections_sent, connections_accepted, 
+            messages_sent, profiles_searched, errors
+        )
+        VALUES (%s, %s, 0, 0, 0, 0)
         ON CONFLICT (date) DO UPDATE SET
             {column} = public.automation_dailystats.{column} + EXCLUDED.{column}
         """
+        
+        # Prepare value: if we are incrementing, EXCLUDED.{column} will be count.
+        # But for the initial INSERT, we need to put the count in the correct column.
+        
+        # Actually, let's make it even simpler and more robust:
+        # Use a dynamic query that sets the target column to 'count' and others to 0 on INSERT.
+        
+        cols = ["connections_sent", "connections_accepted", "messages_sent", "profiles_searched", "errors"]
+        vals = [0] * len(cols)
+        if category in column_map:
+            col_idx = cols.index(column_map[category])
+            vals[col_idx] = count
+            
+        col_str = ", ".join(cols)
+        val_placeholders = ", ".join(["%s"] * len(vals))
+        
+        query = f"""
+        INSERT INTO public.automation_dailystats (date, {col_str})
+        VALUES (%s, {val_placeholders})
+        ON CONFLICT (date) DO UPDATE SET
+            {column} = public.automation_dailystats.{column} + EXCLUDED.{column}
+        """
+        
         try:
             with self.conn.cursor() as cur:
-                cur.execute(query, (today, count))
+                cur.execute(query, [today] + vals)
             return True
         except Exception as e:
             logger.error(f"Failed to record daily stat: {e}")
