@@ -18,6 +18,7 @@ from .auth.session import SessionManager
 from .search.search import UserSearch
 from .search.parser import ProfileParser
 from .connection.connect import ConnectionManager
+from .connection.sales_nav_connect import SalesNavConnectionManager
 from .connection.note import NoteComposer
 from .connection.tracker import ConnectionTracker
 from .messaging.followup import FollowUpMessenger
@@ -234,6 +235,11 @@ class LinkedInBot:
     def run_sending(self, limit: int) -> None:
         """Run the Send_Requests mode."""
         self.request_sender.execute(limit)
+
+    def run_sales_nav_connection(self, url: str, end_page: int, limit: int, message: Optional[str] = None) -> None:
+        """Run the Sales Navigator connection automation."""
+        mgr = SalesNavConnectionManager(self.browser, self.connection_tracker, self.database_manager)
+        mgr.run_automation(url, end_page, limit, message)
 
 
 

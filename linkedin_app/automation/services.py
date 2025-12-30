@@ -70,6 +70,13 @@ class AutomationService:
                     bot.run_filtering(int(params.get('max_connections', 10)))
                 elif command == "Send_Requests":
                     bot.run_sending(int(params.get('max_connections', 10)))
+                elif command == "SalesNavigator_Connect":
+                    bot.run_sales_nav_connection(
+                        url=params.get('sales_nav_url', ''),
+                        end_page=int(params.get('end_page', 1)),
+                        limit=int(params.get('max_connections', 10)),
+                        message=params.get('message', '')
+                    )
                 elif command == "dry_run":
                     import time
                     logger.info("Executing Dry Run - Configuration Valid")
