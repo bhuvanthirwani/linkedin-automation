@@ -1,142 +1,178 @@
-# LinkedIn Automation Tool
-# Educational Purpose Only - Do Not Use in Production
+<div align="center">
 
-## ⚠️ Disclaimer
-This tool is for **educational and technical evaluation purposes only**.
-Automating LinkedIn violates their Terms of Service and may result in account bans.
+# 🚀 LinkedIn Automation Tool   
+### Smart, Stealthy, and Scalable Network Growth
 
-## Features
-- 🔐 **Authentication**: Login with credentials, session persistence, checkpoint detection
-- 🔍 **User Search**: Search by job title, company, location, keywords with pagination
-- 🗄️ **Database Integration**: Fetch LinkedIn URLs from PostgreSQL database and send connection requests
-- 🤝 **Connection Management**: Send personalized connection requests with daily limits
-- 💬 **Follow-up Messaging**: Automated follow-up messages with template support
-- 🛡️ **Anti-Detection**: Human-like behavior patterns, fingerprint masking
-- 🎭 **Stealth Mode**: Random delays, natural mouse movements, typing simulation
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
+![Playwright](https://img.shields.io/badge/Playwright-Automation-orange?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Educational-yellow?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-## Installation
+</div>
 
+---
+
+> [!WARNING]
+> **Educational Purpose Only**  
+> This tool is for **educational and technical evaluation purposes only**. Automating LinkedIn violates their Terms of Service and may result in account bans. Use responsibly and at your own risk.
+
+## 🌟 Overview
+This project is a powerful, educational Python-based automation tool designed to demonstrate how to programmatically interact with LinkedIn. It simulates human behavior to perform tasks like searching for professionals, sending connection requests, and managing follow-up messages.
+
+## ✨ Key Features
+
+| Feature | Description |
+| :--- | :--- |
+| 🛡️ **Anti-Detection** | Human-like mouse movements, random delays, and typing simulation to fly under the radar. |
+| 🔍 **Smart Search** | Advanced filtering by **Job Title**, **Company**, **Location**, and **Keywords**. |
+| 🗄️ **Database Integration** | Seamlessly fetch targets from a PostgreSQL database for scalable campaigns. |
+| 🤝 **Auto-Connect** | Send personalized connection requests with daily limit enforcement. |
+| 💬 **Follow-Up System** | Automated follow-up sequences for new connections using customizable templates. |
+| 🔐 **Secure Auth** | Robust session management with cookie persistence and checkpoint handling. |
+
+---
+
+## 🛠️ Installation
+
+### 1. Prerequisities
+Ensure you have **Python 3.10+** installed.
+
+### 2. Setup
 ```bash
-# Create virtual environment
+# Clone the repository (if applicable)
+# git clone ...
+
+# Create and activate a virtual environment
 python -m venv venv
 
-# Activate virtual environment
-# Windows:
+# Windows
 venv\Scripts\activate
-# Linux/Mac:
+# Linux/Mac
 source venv/bin/activate
 
-# Install dependencies
+# Install Python dependencies
 pip install -r requirements.txt
 
 # Install Playwright browsers
 playwright install chromium
 ```
 
-## Configuration
+---
 
-1. Copy the example config:
+## ⚙️ Configuration
+
+### 1. Environment Variables
+Create a `.env` file or set these variables in your shell:
+
+| Variable | Description |
+| :--- | :--- |
+| `LINKEDIN_EMAIL` | Your LinkedIn login email. |
+| `LINKEDIN_PASSWORD` | Your LinkedIn login password. |
+| `DB_POSTGRESDB_HOST` | (Optional) Database host. |
+| `DB_POSTGRESDB_USER` | (Optional) Database user. |
+| `DB_POSTGRESDB_PASSWORD` | (Optional) Database password. |
+
+### 2. Config File
+Copy the example config and customize it:
 ```bash
 cp configs/config.example.yaml configs/config.yaml
 ```
 
-2. Set your credentials via environment variables:
+<details>
+<summary><strong>📝 Click to view `config.yaml` structure</strong></summary>
+
+```yaml
+linkedin:
+  email: ...
+  password: ...
+
+browser:
+  headless: false  # Set to true for background execution
+
+rate_limits:
+  daily_connection_limit: 25
+  daily_message_limit: 50
+  min_delay_seconds: 5
+  max_delay_seconds: 15
+```
+</details>
+
+---
+
+## 🚀 Usage Guide
+
+Run the bot with `python run.py`. Below are the common modes of operation.
+
+### 🔍 Scrapping Mode
+*Scrapes profiles from search results and saves them to the database.*
 ```bash
-set LINKEDIN_EMAIL=your_email@example.com
-set LINKEDIN_PASSWORD=your_password
+python run.py --mode Scrapping \
+    --keywords "Senior Software Engineer" \
+    --location "90000084" \
+    --start-page 1 \
+    --pages 5 \
+    --max-connections 50
 ```
 
-Or edit `configs/config.yaml` directly.
-
-3. (Optional) For database mode, set database credentials:
+### 🎯 Filtering & Sending
+*Checks scraped profiles for activity and sends requests.*
 ```bash
-set DB_POSTGRESDB_HOST=your_host
-set DB_POSTGRESDB_PORT=5432
-set DB_POSTGRESDB_DATABASE=your_database
-set DB_POSTGRESDB_USER=your_user
-set DB_POSTGRESDB_PASSWORD=your_password
-set DB_POSTGRESDB_SCHEMA=public
-```
-
-Or configure in `configs/config.yaml` under the `database` section.
-
-## Usage
-
-```bash
-# Run the bot
-python run.py --config configs/config.yaml
-
-# 1. Scrapping Mode
-# Scrapes profiles from search results to database
-# --start-page: page to start from (e.g. 1)
-# --pages: number of pages to scrape (e.g. 10)
-# --max-connections: LIMIT number of profiles to save (stops early if reached)
-python run.py --mode Scrapping --keywords "Senior Software Engineer" --location "90000084" --start-page 22 --pages 10 --max-connections 30
-
-# 2. Filtering & Sending Mode
-# Checks activity of scraped profiles and sends requests to active ones
-# --max-connections: TARGET number of requests to send (stops when sent count is reached)
 python run.py --mode Filtering --max-connections 20
-
-# 3. Send Requests Mode (Manual/Legacy)
-# Sends requests to profiles already marked as active
-python run.py --mode Send_Requests --max-connections 10
-
-# Database mode - fetch URLs from database and send connection requests
-python run.py --mode database --max-connections 10
-
-# Search and connect mode (Legacy)
-python run.py --mode search --keywords "Software Engineer" --location "San Francisco"
-
-# Dry run (no actual actions)
-python run.py --dry-run
 ```
 
-## Project Structure
-
+### 📦 Database Mode
+*Fetch specific targets from your database and connect.*
+```bash
+python run.py --mode database --max-connections 15
 ```
+
+### 🤖 Search & Connect (Direct)
+*Search and connect immediately (bypassing database).*
+```bash
+python run.py --mode search \
+    --keywords "Founder" \
+    --location "90000084" \
+    --max-connections 10
+```
+
+### 📨 Follow-Up Messages
+*Send follow-up messages to people who accepted your request.*
+```bash
+python run.py --mode followup --max-messages 10
+```
+
+### 🧪 Dry Run
+*Test your command without performing actual actions.*
+```bash
+python run.py --mode <ANY_MODE> --dry-run
+```
+
+---
+
+## 📂 Project Structure
+
+```bash
 linkedin-automation/
-├── src/
-│   ├── main.py              # Entry point
-│   ├── browser/
-│   │   ├── browser.py       # Browser automation engine
-│   │   ├── antidetect.py    # Anti-detection mechanisms
-│   │   └── humanize.py      # Human-like behavior
-│   ├── auth/
-│   │   ├── login.py         # Login functionality
-│   │   ├── session.py       # Session management
-│   │   └── checkpoint.py    # 2FA/captcha detection
-│   ├── search/
-│   │   ├── search.py        # User search
-│   │   ├── parser.py        # Profile parser
-│   │   └── pagination.py    # Pagination handler
-│   ├── connection/
-│   │   ├── connect.py       # Connection requests
-│   │   ├── note.py          # Personalized notes
-│   │   └── tracker.py       # Request tracking
-│   ├── messaging/
-│   │   ├── followup.py      # Follow-up messages
-│   │   ├── template.py      # Template engine
-│   │   └── tracker.py       # Message tracking
-│   ├── database/
-│   │   └── db.py            # Database connection and queries
-│   └── utils/
-│       ├── config.py        # Configuration
-│       └── models.py        # Data models
-├── configs/
-│   └── config.yaml          # Configuration file
-├── data/
-│   ├── cookies/             # Session cookies
-│   └── tracking/            # Request/message tracking
-├── requirements.txt
-└── README.md
+├── 📁 configs/          # Configuration files
+├── 📁 data/             # Persistent data (cookies, tracking logs)
+├── 📁 src/              # Source code
+│   ├── 📁 auth/         # Login & Session management
+│   ├── 📁 browser/      # Playwright wrapper & Anti-detect
+│   ├── 📁 connection/   # Connection logic & Note composition
+│   ├── 📁 database/     # DB operations
+│   ├── 📁 features/     # High-level workflows (Scrapers, Filters)
+│   ├── 📁 messaging/    # Message templates & Sending logic
+│   └── 📁 search/       # Search execution & Parsing
+├── 📄 run.py            # CLI Entry point
+└── 📄 requirements.txt  # Dependencies
 ```
 
-## Rate Limits (Default)
-- Daily connections: 25
-- Daily messages: 50
-- Min delay between actions: 2-5 seconds
-- Page load delay: 3 seconds
+---
 
-## License
-MIT - Educational Use Only
+<div align="center">
+
+**[🐛 Report Bug](https://github.com/yourusername/linkedin-automation/issues) | [📝 Request Feature](https://github.com/yourusername/linkedin-automation/issues)**
+
+*Built with ❤️ for automation enthusiasts.*
+
+</div>
