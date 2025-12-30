@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="grid grid-cols-12 gap-6 h-full" x-data="{ mode: 'dry_run' }">
+
+    <!-- Control Panel -->
+    <div class="col-span-12 lg:col-span-4 space-y-6">
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 gap-4">
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                <p class="text-gray-400 text-sm">Total Profiles</p>
+                <p class="text-2xl font-bold text-white mt-1">{{ stats.profiles }}</p>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 text-right">
+                <p class="text-gray-400 text-sm">Conn. Sent</p>
+                <p class="text-2xl font-bold text-blue-400 mt-1">{{ stats.connections_sent }}</p>
+            </div>
+        </div>
+
+        <!-- Start New Task -->
+        <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 shadow-xl">
+            <h3 class="text-lg font-semibold mb-4 text-white flex items-center">
+                <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                Automation Controls
+            </h3>
+
+            <div id="form-message" class="mb-4"></div>
+
+            <form hx-post="{% url 'start_task' %}" hx-target="#form-message" hx-swap="innerHTML" class="space-y-4">
+                {% csrf_token %}
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Select Mode</label>
+                    <select name="command" x-model="mode"
+                        class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all">
+                        <option value="dry_run">Dry Run (Configuration Test)</option>
+                        <option value="Scrapping">Scraping (Find & Save Profiles)</option>
+                        <option value="Filtering">Filtering (Evaluate & Connect)</option>
+                        <option value="Send_Requests">Database Mode (Connect from list)</option>
+                        <option value="followup">Follow-up Messages</option>
+                    </select>
+                </div>
+
+                <!-- Scraping Fields -->
+                <div x-show="mode === 'Scrapping'" x-transition
+                    class="space-y-4 border-l-2 border-blue-500/30 pl-4 py-2">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Keywords</label>
+                            <input type="text" name="keywords" placeholder="CEO, Founder"
+                                class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Location</label>
+                            <input type="text" name="location" placeholder="Remote"
+                                class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Start Page</label>
+                            <input type="number" name="start_page" value="1"
+                                class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Pages to Scrape</label>
+                            <input type="number" name="pages" value="5"
+                                class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Database Mode Fields -->
+                <div x-show="mode === 'Send_Requests'" x-transition
+                    class="space-y-4 border-l-2 border-purple-500/30 pl-4 py-2">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Table Name</label>
+                        <input type="text" name="table" placeholder="raw_linkedin_ingest"
+                            class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Where Clause (SQL)</label>
+                        <input type="text" name="where" placeholder="industry = 'Tech'"
+                            class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Common Field: Max Connections -->
+                <div x-show="['Scrapping', 'Filtering', 'Send_Requests'].includes(mode)" x-transition>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Max Connection Requests</label>
+                    <input type="number" name="max_connections" value="10"
+                        class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+
+                <!-- Followup Field -->
+                <div x-show="mode === 'followup'" x-transition>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Max Messages</label>
+                    <input type="number" name="max_messages" value="20"
+                        class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+
+                <button type="submit"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-all transform active:scale-95 flex justify-center items-center htmx-indicator-toggle">
+                    <span class="htmx-indicator-hidden flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z">
+                            </path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Execute Command
+                    </span>
+                    <span class="htmx-indicator flex items-center">
+                        <svg class="animate-spin h-5 w-5 mr-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        Processing...
+                    </span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Recent Jobs -->
+        <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 h-[400px] flex flex-col">
+            <h3 class="text-lg font-semibold mb-4 text-white">Execution History</h3>
+            <div class="space-y-3 overflow-y-auto flex-1 pr-2">
+                {% for job in jobs %}
+                <div class="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg border border-gray-700/50">
+                    <div>
+                        <p class="font-medium text-sm text-white">{{ job.command }}</p>
+                        <p class="text-[10px] text-gray-500 uppercase tracking-tighter">{{ job.created_at|date:"H:i:s"
+                            }} - {{ job.created_at|timesince }} ago</p>
+                    </div>
+                    <span class="px-2 py-1 text-[10px] font-bold rounded-full 
+                        {% if job.status == 'COMPLETED' %}bg-green-500/10 text-green-400
+                        {% elif job.status == 'RUNNING' %}bg-blue-500/10 text-blue-400 animate-pulse
+                        {% elif job.status == 'FAILED' %}bg-red-500/10 text-red-400
+                        {% else %}bg-gray-500/10 text-gray-400{% endif %}">
+                        {{ job.status }}
+                    </span>
+                </div>
+                {% empty %}
+                <p class="text-gray-500 text-sm text-center mt-10 italic">No tasks executed yet.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Window -->
+    <div class="col-span-12 lg:col-span-8 flex flex-col h-full max-h-[calc(100vh-8rem)]">
+        <div class="bg-black rounded-t-xl p-4 flex items-center justify-between border-b border-gray-800">
+            <div class="flex items-center space-x-2">
+                <div class="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
+                <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+                <span class="ml-2 text-gray-300 font-mono text-xs uppercase tracking-widest">System Monitor</span>
+            </div>
+
+            <div hx-get="{% url 'get_logs' %}" hx-trigger="every 2s" hx-target="#log-container" hx-swap="innerHTML"
+                class="flex items-center text-[10px] text-gray-500 font-mono uppercase">
+                <span class="text-blue-500 mr-2">POLLING...</span>
+                {% now "H:i:s" %}
+            </div>
+        </div>
+
+        <div id="log-window"
+            class="flex-1 bg-[#0a0a0a] p-6 font-mono text-sm overflow-y-auto log-window rounded-b-xl border border-t-0 border-gray-800 shadow-2xl">
+            <div id="log-container" class="space-y-1">
+                <div class="text-blue-900 border-b border-blue-900/30 pb-2 mb-4">LOG_STREAM_INITIALIZED</div>
+                <div class="text-gray-600">Waiting for automation event...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-scroll logic with smart detection
+    const logContainer = document.getElementById('log-container');
+    const logWindow = document.getElementById('log-window');
+
+    const observer = new MutationObserver(() => {
+        // Only scroll if we were already at the bottom
+        const threshold = 100;
+        const isAtBottom = logWindow.scrollHeight - logWindow.scrollTop - logWindow.clientHeight < threshold;
+
+        if (isAtBottom) {
+            logWindow.scrollTo({
+                top: logWindow.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+    });
+
+    observer.observe(logContainer, { childList: true, subtree: true });
+</script>
+{% endblock %}

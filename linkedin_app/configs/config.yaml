@@ -1,0 +1,56 @@
+# LinkedIn Automation Configuration
+
+linkedin:
+  # Credentials (prefer environment variables: LINKEDIN_EMAIL, LINKEDIN_PASSWORD)
+  email: "bhuvanthirwani@gmail.com"
+  password: "Linkedin@1999#"
+  base_url: "https://www.linkedin.com"
+
+browser:
+  headless: false
+  timeout: 30000  # milliseconds
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  viewport_width: 1920
+  viewport_height: 1080
+
+rate_limits:
+  daily_connection_limit: 25
+  daily_message_limit: 50
+  min_delay_seconds: 2
+  max_delay_seconds: 5
+  page_load_delay_seconds: 3
+
+search:
+  max_pages: 10
+  skip_duplicates: true
+
+messaging:
+  connection_note_template: "Hi {first_name}, I loved your profile! I saw the Software Engineer opening at your organization & would love to apply. I recently interned at Salesforce, developing full-stack AI-powered applications that combined scalable backend systems with data pipelines. Could you please refer me?"
+  max_note_length: 300
+  follow_up_templates:
+    - "Hi {first_name}, thanks for connecting! I'd love to learn more about your experience at your organization."
+    - "Great to connect, {first_name}! Looking forward to staying in touch."
+
+paths:
+  cookies_dir: "linkedin_app/data/cookies"
+  tracking_dir: "linkedin_app/data/tracking"
+
+database:
+  # PostgreSQL database configuration
+  # Can also be set via environment variables:
+  # DB_POSTGRESDB_HOST, DB_POSTGRESDB_PORT, DB_POSTGRESDB_DATABASE,
+  # DB_POSTGRESDB_USER, DB_POSTGRESDB_PASSWORD, DB_POSTGRESDB_SCHEMA
+  db_type: "postgresdb"
+  host: "aws-0-us-west-2.pooler.supabase.com"
+  port: 6543
+  database: "postgres"
+  user: "postgres.vsopxksmpxchsyvyifcg"
+  password: "Bhuvan@303#"
+  schema: "public"
+  table_name: "raw_linkedin_ingest"
+  url_column: "linkedin_url"
+  # Optional: Exclude URLs that already exist in connection_requests
+  # When fetching from raw_linkedin_ingest, automatically excludes
+  # URLs that exist in connection_requests (via candidates table)
+  exclude_table: "linkedin_db_connection_requests"  # Set to null/empty to disable
+  exclude_url_column: "linkedin_url"  # This will be resolved through candidates table

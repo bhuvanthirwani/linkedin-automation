@@ -35,13 +35,11 @@ This project is a powerful, educational Python-based automation tool designed to
 ## 🛠️ Installation
 
 ### 1. Prerequisities
-Ensure you have **Python 3.10+** installed.
+- **Python 3.10+** (Stable version recommended. **Note**: Python 3.14 may cause issues with dependencies like `pydantic`).
+- **Node.js** (Optional, for advanced Tailwind support).
 
 ### 2. Setup
 ```bash
-# Clone the repository (if applicable)
-# git clone ...
-
 # Create and activate a virtual environment
 python -m venv venv
 
@@ -50,8 +48,12 @@ venv\Scripts\activate
 # Linux/Mac
 source venv/bin/activate
 
-# Install Python dependencies
+# Install Dependencies
 pip install -r requirements.txt
+pip install django django-tailwind uvicorn
+
+# Initialize Database
+python linkedin_app/manage.py migrate
 
 # Install Playwright browsers
 playwright install chromium
@@ -61,22 +63,29 @@ playwright install chromium
 
 ## ⚙️ Configuration
 
-### 1. Environment Variables
-Create a `.env` file or set these variables in your shell:
-
-| Variable | Description |
-| :--- | :--- |
-| `LINKEDIN_EMAIL` | Your LinkedIn login email. |
-| `LINKEDIN_PASSWORD` | Your LinkedIn login password. |
-| `DB_POSTGRESDB_HOST` | (Optional) Database host. |
-| `DB_POSTGRESDB_USER` | (Optional) Database user. |
-| `DB_POSTGRESDB_PASSWORD` | (Optional) Database password. |
-
-### 2. Config File
-Copy the example config and customize it:
+### 1. Environment Variables / Config
+The app continues to use `configs/config.yaml` for automation settings. Ensure this file exists:
 ```bash
 cp configs/config.example.yaml configs/config.yaml
 ```
+
+The Django app settings are in `linkedin_app/linkedin_app/settings.py`.
+
+---
+
+## 🚀 Usage Guide (Web App)
+
+Start the Web Interface:
+```bash
+python linkedin_app/manage.py runserver
+```
+
+Then open your browser at **[http://127.0.0.1:8000](http://127.0.0.1:8000)**.
+
+### Features
+- **Dashboard**: View real-time statistics and start new jobs.
+- **Modes**: Select from Scrapping, Filtering, or Sending modes directly from the UI.
+- **Live Logs**: Watch the automation logs stream in real-time in the "Terminal Output" window.
 
 <details>
 <summary><strong>📝 Click to view `config.yaml` structure</strong></summary>

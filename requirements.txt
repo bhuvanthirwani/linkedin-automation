@@ -1,7 +1,7 @@
 playwright>=1.40.0
 pyyaml>=6.0
 python-dotenv>=1.0.0
-pydantic>=2.5.0
 loguru>=0.7.2
-aiofiles>=23.2.1
-asyncpg>=0.29.0
+psycopg2-binary>=2.9.9
+django>=5.0.0
+django-htmx>=1.17.0
