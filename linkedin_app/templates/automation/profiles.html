@@ -27,20 +27,22 @@
                             <div class="text-xs text-gray-500">{{ profile.location }}</div>
                         </td>
                         <td class="px-6 py-4 max-w-md truncate text-gray-400 text-sm">
-                            {{ profile.headline }}
+                            {{ profile.scrape_status }}
                         </td>
                         <td class="px-6 py-4">
-                            {% if profile.connection_request_sent %}
+                            {% if profile.request_status == 'sent' %}
                             <span class="px-2 py-1 text-xs rounded-full bg-green-500/20 text-green-400">Sent</span>
+                            {% elif profile.request_status == 'pending' %}
+                            <span class="px-2 py-1 text-xs rounded-full bg-yellow-500/20 text-yellow-400">Pending</span>
                             {% else %}
-                            <span class="px-2 py-1 text-xs rounded-full bg-gray-500/20 text-gray-400">Pending</span>
+                            <span class="px-2 py-1 text-xs rounded-full bg-gray-500/20 text-gray-400">Not Sent</span>
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-500">
                             {{ profile.scraped_at|date:"M d, Y H:i" }}
                         </td>
                         <td class="px-6 py-4 text-right">
-                            <a href="{{ profile.profile_url }}" target="_blank"
+                            <a href="{{ profile.linkedin_url }}" target="_blank"
                                 class="text-blue-400 hover:text-blue-300 text-sm flex items-center justify-end">
                                 View Profile
                                 <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

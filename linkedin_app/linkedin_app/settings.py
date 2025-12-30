@@ -75,8 +75,12 @@ WSGI_APPLICATION = 'linkedin_app.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'postgres',
+        'USER': 'postgres.vsopxksmpxchsyvyifcg',
+        'PASSWORD': 'Bhuvan@303#',
+        'HOST': 'aws-0-us-west-2.pooler.supabase.com',
+        'PORT': '6543',
     }
 }
 

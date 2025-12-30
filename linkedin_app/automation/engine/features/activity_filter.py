@@ -54,15 +54,14 @@ class ActivityFilter:
                 
                 try:
                     # 1. Navigate
-                    logger.info(f"Navigating to profile: {url}")
+                    progress_info = f"[{(requests_sent_session + 1):02d}/{target_connections:02d}]"
+                    logger.info(f"{progress_info} Processing: {url}")
+                    
                     self.browser.navigate(url)
-                    logger.info("Waiting after navigation...")
-                    self.browser.humanizer.random_delay(3000, 5000)
+                    self.browser.humanizer.random_delay(2000, 4000)
                     
                     # 2. Find Activity Section
-                    logger.info("Scrolling to find activity section...")
                     self.browser.scroll(amount=600)
-                    logger.info("Waiting after scroll...")
                     self.browser.humanizer.random_delay(1000, 2000)
                     
                     activity_section = self.browser.page.locator(ACTIVITY_SECTION_SELECTOR).filter(
@@ -70,10 +69,9 @@ class ActivityFilter:
                     )
                     
                     section_count = activity_section.count()
-                    logger.info(f"Activity section found count: {section_count}")
                     
                     if section_count == 0:
-                        logger.warning(f"No Activity section found for {url}")
+                        logger.warning(f"No Activity section found for {url}. Skipping.")
                         self.db.update_network_activity(url, {
                             "raw": None, "value": None, "unit": None, "minutes": None, "status": "scraped"
                         })
@@ -87,30 +85,24 @@ class ActivityFilter:
                     
                     has_posts = posts_btn.count() > 0
                     has_comments = comments_btn.count() > 0
-                    logger.info(f"Activity tabs present - Posts: {has_posts}, Comments: {has_comments}")
                     
                     views_to_check = []
                     if has_posts: views_to_check.append(("Posts", posts_btn))
                     if has_comments: views_to_check.append(("Comments", comments_btn))
                     
                     if not views_to_check:
-                         logger.info("No Posts/Comments pills, checking default view.")
                          recency_candidates.extend(self._scrape_current_view_times(activity_section))
                     else:
                         for label, btn in views_to_check:
-                            logger.info(f"Clicking {label} filter...")
                             try:
                                 btn.first.click()
-                                logger.info(f"Waiting for {label} content to load...")
-                                self.browser.humanizer.random_delay(2000, 4000)
+                                self.browser.humanizer.random_delay(1500, 3000)
                                 timestamps = self._scrape_current_view_times(activity_section)
-                                logger.info(f"Found timestamps in {label}: {timestamps}")
                                 recency_candidates.extend(timestamps)
                             except Exception as e:
-                                logger.warning(f"Failed to click {label} button: {e}")
+                                logger.warning(f"Failed to check {label} for {url}: {e}")
 
                     # 4. Determine best recency
-                    logger.info(f"All recency candidates: {recency_candidates}")
                     best_recency = { "raw": None, "value": None, "unit": None, "minutes": None, "status": "scraped" }
                     valid_candidates = [r for r in recency_candidates if r.get('minutes') is not None]
                     
@@ -120,7 +112,7 @@ class ActivityFilter:
                         best_recency["status"] = "scraped"
                     
                     recency = best_recency
-                    logger.info(f"Best recency for {url}: {recency}")
+                    logger.info(f"Activity for {url}: {recency.get('raw') or 'None'}")
 
                     # 5. Update DB
                     self.db.update_network_activity(url, {
@@ -136,18 +128,14 @@ class ActivityFilter:
                         and recency['minutes'] <= 50000 
                         and recency['status'] == 'scraped'):
                         
-                        logger.info(f"Profile {url} active ({recency.get('raw')}). Sending request...")
-                        
                         p_name = profile['name'] or ""
                         profile_obj = Profile(url=url, name=p_name)
                         if profile.get('first_name'): profile_obj.first_name = profile['first_name']
                         if profile.get('last_name'): profile_obj.last_name = profile['last_name']
                         
                         try:
-                            logger.info(f"Initiating connection request to {url}")
-                            self.db.update_request_status(url, 'pending')
+                            self.db.record_connection_status(url, 'pending')
                             result = self.connection_manager.send_connection_request(profile_obj)
-                            logger.info(f"Connection request result: {result}")
                             
                             db_status = 'failed'
                             if result.error:
@@ -165,8 +153,7 @@ class ActivityFilter:
                             elif result.status == ConnectionStatus.ERROR:
                                  db_status = 'failed'
                             
-                            logger.info(f"Final status for {url}: {db_status}")
-                            self.db.update_request_status(url, db_status)
+                            self.db.record_connection_status(url, db_status)
                             
                             if db_status == 'sent':
                                 requests_sent_session += 1

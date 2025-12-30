@@ -57,7 +57,7 @@ class NetworkScraper:
             
             saved_count += batch_saved
             if batch_saved > 0:
-                logger.info(f"Successfully saved {batch_saved} profiles. Total: {saved_count}")
+                logger.info(f"Progress: Found {len(profiles)} on page. Saved {batch_saved} new. Running total: {saved_count}")
         
         logger.info(f"Navigating to search page for '{keywords}'...")
         self.searcher.search(criteria, on_page_scraped=save_batch)

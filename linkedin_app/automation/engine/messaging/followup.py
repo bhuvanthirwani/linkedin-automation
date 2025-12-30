@@ -51,14 +51,14 @@ class FollowUpMessenger:
         """
         logger.info(f"Sending follow-up message to {profile.name}")
         
-        if self.tracker.get_today_count() >= self.daily_limit:
-            logger.warning("Daily message limit reached")
-            return Message(
-                recipient_url=profile.url,
-                recipient_name=profile.name,
-                content="",
-                error="Daily message limit reached",
-            )
+        # if self.tracker.get_today_count() >= self.daily_limit:
+        #     logger.warning("Daily message limit reached")
+        #     return Message(
+        #         recipient_url=profile.url,
+        #         recipient_name=profile.name,
+        #         content="",
+        #         error="Daily message limit reached",
+        #     )
         
         try:
             # Navigate to profile
@@ -165,8 +165,8 @@ class FollowUpMessenger:
         connections = self.get_new_connections(limit=limit)
         messages = []
         for profile in connections:
-            if self.tracker.get_today_count() >= self.daily_limit:
-                break
+            # if self.tracker.get_today_count() >= self.daily_limit:
+            #     break
             msg = self.send_followup(profile)
             messages.append(msg)
             if self.browser.humanizer.should_take_break(len(messages)):

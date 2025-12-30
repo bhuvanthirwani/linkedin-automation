@@ -80,6 +80,19 @@ class LinkedInBot:
         self.browser.start()
         logger.info("Browser Engine started.")
         
+        # Create database manager first
+        if self.config.database.host and self.config.database.user:
+            self.database_manager = DatabaseManager(
+                host=self.config.database.host,
+                port=self.config.database.port,
+                database=self.config.database.database,
+                user=self.config.database.user,
+                password=self.config.database.password,
+                schema=self.config.database.schema,
+            )
+            self.database_manager.connect()
+            logger.info("Database manager connected (Sync)")
+
         # Create session manager
         self.session_manager = SessionManager(
             self.browser,
@@ -94,22 +107,9 @@ class LinkedInBot:
             self.session_manager,
         )
         
-        # Create trackers
-        self.connection_tracker = ConnectionTracker(self.config.paths.tracking_dir)
-        self.message_tracker = MessageTracker(self.config.paths.tracking_dir)
-        
-        # Create database manager
-        if self.config.database.host and self.config.database.user:
-            self.database_manager = DatabaseManager(
-                host=self.config.database.host,
-                port=self.config.database.port,
-                database=self.config.database.database,
-                user=self.config.database.user,
-                password=self.config.database.password,
-                schema=self.config.database.schema,
-            )
-            self.database_manager.connect()
-            logger.info("Database manager connected (Sync)")
+        # Create trackers (passing db manager)
+        self.connection_tracker = ConnectionTracker(self.database_manager)
+        self.message_tracker = MessageTracker(self.database_manager)
         
         # Create note composer
         note_composer = NoteComposer(self.config.messaging.connection_note_template)

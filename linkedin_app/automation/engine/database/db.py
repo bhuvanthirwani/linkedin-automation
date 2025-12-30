@@ -2,7 +2,7 @@
 PostgreSQL database connection and query management.
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Optional, Dict, Any
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -272,16 +272,126 @@ class DatabaseManager:
             logger.error(f"Failed to fetch profiles for sending: {e}")
             return []
 
-    def update_request_status(self, url: str, status: str) -> bool:
-        """Update request status."""
+    def record_connection_status(self, url: str, status: str) -> bool:
+        """Update connection status in network data table."""
         if not self.conn: return False
-        query = "UPDATE public.linkedin_db_network_data SET request_status = %s, updated_at = NOW() WHERE linkedin_url = %s"
+        query = "UPDATE public.linkedin_db_network_data SET request_status = %s, request_sent_at = NOW(), updated_at = NOW() WHERE linkedin_url = %s"
         try:
             with self.conn.cursor() as cur:
                 cur.execute(query, (status, url))
             return True
         except Exception as e:
-            logger.error(f"Failed to update request status: {e}")
+            logger.error(f"Failed to update connection status: {e}")
+            return False
+
+    def record_daily_stat(self, category: str, count: int = 1) -> bool:
+        """Increment daily statistic for a specific category."""
+        if not self.conn: return False
+        today = date.today().isoformat()
+        
+        # Mapping categories to column names
+        column_map = {
+            "connections_sent": "connections_sent",
+            "connections_accepted": "connections_accepted",
+            "messages_sent": "messages_sent",
+            "profiles_searched": "profiles_searched",
+            "errors": "errors"
+        }
+        
+        column = column_map.get(category)
+        if not column:
+            logger.error(f"Invalid stat category: {category}")
+            return False
+            
+        query = f"""
+        INSERT INTO public.automation_dailystats (date, {column})
+        VALUES (%s, %s)
+        ON CONFLICT (date) DO UPDATE SET
+            {column} = public.automation_dailystats.{column} + EXCLUDED.{column}
+        """
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(query, (today, count))
+            return True
+        except Exception as e:
+            logger.error(f"Failed to record daily stat: {e}")
+            return False
+
+    def get_daily_stat(self, category: str, date_str: Optional[str] = None) -> int:
+        """Get statistic for a specific category and date."""
+        if not self.conn: return 0
+        date_val = date_str or date.today().isoformat()
+        
+        column_map = {
+            "connections_sent": "connections_sent",
+            "messages_sent": "messages_sent",
+            "errors": "errors"
+        }
+        column = column_map.get(category)
+        if not column: return 0
+        
+        query = f"SELECT {column} FROM public.automation_dailystats WHERE date = %s"
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(query, (date_val,))
+                row = cur.fetchone()
+                return row[0] if row else 0
+        except Exception as e:
+            logger.error(f"Failed to get daily stat: {e}")
+            return 0
+
+    def record_connection_history(self, profile_url: str, profile_name: str, status: str, note: str = "", error: str = None) -> bool:
+        """Record connection request in history table."""
+        if not self.conn: return False
+        query = """
+        INSERT INTO public.automation_connectiontracking (profile_url, profile_name, sent_at, status, note, error)
+        VALUES (%s, %s, NOW(), %s, %s, %s)
+        """
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(query, (profile_url, profile_name, status, note, error))
+            return True
+        except Exception as e:
+            logger.error(f"Failed to record connection history: {e}")
+            return False
+
+    def is_connection_sent(self, profile_url: str) -> bool:
+        """Check if connection was already sent to this URL."""
+        if not self.conn: return False
+        query = "SELECT 1 FROM public.automation_connectiontracking WHERE profile_url = %s LIMIT 1"
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(query, (profile_url,))
+                return cur.fetchone() is not None
+        except Exception as e:
+            logger.error(f"Failed to check connection history: {e}")
+            return False
+
+    def record_message_history(self, recipient_url: str, recipient_name: str, content: str, template: str = "", error: str = None) -> bool:
+        """Record message in history table."""
+        if not self.conn: return False
+        query = """
+        INSERT INTO public.automation_messagetracking (recipient_url, recipient_name, content, sent_at, template_used, error)
+        VALUES (%s, %s, %s, NOW(), %s, %s)
+        """
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(query, (recipient_url, recipient_name, content, template, error))
+            return True
+        except Exception as e:
+            logger.error(f"Failed to record message history: {e}")
+            return False
+
+    def is_already_messaged(self, profile_url: str) -> bool:
+        """Check if profile was already messaged successfully."""
+        if not self.conn: return False
+        query = "SELECT 1 FROM public.automation_messagetracking WHERE recipient_url = %s AND error IS NULL LIMIT 1"
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(query, (profile_url,))
+                return cur.fetchone() is not None
+        except Exception as e:
+            logger.error(f"Failed to check message history: {e}")
             return False
 
     def delete_from_raw_ingest(self, url: str) -> bool:

@@ -27,7 +27,9 @@ class RequestSender:
         logger.info(f"Found {len(profiles_data)} candidates for connection requests.")
         
         sent_count = 0
-        for p_data in profiles_data:
+        total_candidates = len(profiles_data)
+        
+        for idx, p_data in enumerate(profiles_data, 1):
             url = p_data['linkedin_url']
             name = p_data['name']
             
@@ -36,11 +38,12 @@ class RequestSender:
                 profile.first_name = p_data['first_name']
             if p_data.get('last_name'):
                 profile.last_name = p_data['last_name']
-                
-            logger.info(f"Processing candidate: {name} (Activity: {p_data.get('recent_activity_minutes')}m)")
+            
+            progress_info = f"[{idx:02d}/{total_candidates:02d}]"
+            logger.info(f"{progress_info} Sending to: {name} (Activity: {p_data.get('recent_activity_minutes')}m)")
             
             try:
-                self.db.update_request_status(url, 'pending')
+                self.db.record_connection_status(url, 'pending')
                 result = self.connection_manager.send_connection_request(profile)
                 
                 db_status = 'failed'
@@ -59,14 +62,17 @@ class RequestSender:
                 elif result.status == ConnectionStatus.ERROR:
                      db_status = 'failed'
                 
-                self.db.update_request_status(url, db_status)
+                self.db.record_connection_status(url, db_status)
                 
                 if db_status == 'sent':
                     sent_count += 1
+                    logger.info(f"Sent successfully! (Session: {sent_count})")
                     self.browser.humanizer.random_delay(10000, 20000)
+                else:
+                    logger.info(f"Not sent (Status: {db_status})")
                 
             except Exception as e:
                 logger.error(f"Error sending request to {url}: {e}")
-                self.db.update_request_status(url, 'failed')
+                self.db.record_connection_status(url, 'failed')
 
-        logger.info(f"Send_Requests completed. Sent: {sent_count}")
+        logger.info(f"Send_Requests completed. Total Sent: {sent_count}")

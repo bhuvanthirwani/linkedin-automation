@@ -189,16 +189,8 @@
     const logWindow = document.getElementById('log-window');
 
     const observer = new MutationObserver(() => {
-        // Only scroll if we were already at the bottom
-        const threshold = 100;
-        const isAtBottom = logWindow.scrollHeight - logWindow.scrollTop - logWindow.clientHeight < threshold;
-
-        if (isAtBottom) {
-            logWindow.scrollTo({
-                top: logWindow.scrollHeight,
-                behavior: 'smooth'
-            });
-        }
+        // Force scroll to bottom whenever content changes
+        logWindow.scrollTop = logWindow.scrollHeight;
     });
 
     observer.observe(logContainer, { childList: true, subtree: true });

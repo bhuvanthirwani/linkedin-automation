@@ -29,28 +29,77 @@ class LogEntry(models.Model):
     timestamp = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        ordering = ['-timestamp']
+        ordering = ['timestamp']
 
 class LinkedInProfile(models.Model):
-    """Stores scraped LinkedIn profile data."""
-    public_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
-    url = models.URLField(unique=True)
+    """Stores scraped LinkedIn profile data (Matches linkedin_db_network_data)."""
+    linkedin_url = models.URLField(unique=True)
+    name = models.CharField(max_length=500, blank=True)
     first_name = models.CharField(max_length=255, blank=True)
     last_name = models.CharField(max_length=255, blank=True)
-    full_name = models.CharField(max_length=500, blank=True)
-    headline = models.CharField(max_length=1000, blank=True)
-    location = models.CharField(max_length=255, blank=True)
-    about = models.TextField(blank=True)
+    location = models.CharField(max_length=500, blank=True)
     
-    # Tracking
-    is_connected = models.BooleanField(default=False)
-    connection_request_sent = models.BooleanField(default=False)
-    connection_sent_at = models.DateTimeField(null=True, blank=True)
+    # Activity and Status
+    recent_activity_raw = models.TextField(blank=True, null=True)
+    scrape_status = models.CharField(max_length=50, default='not_scraped')
+    request_status = models.CharField(max_length=50, default='not_sent')
     
-    scraped_at = models.DateTimeField(auto_now=True)
+    scraped_at = models.DateTimeField(null=True, blank=True)
+    request_sent_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'linkedin_db_network_data'
+        managed = False # Managed by the automation engine's raw SQL usually, but we can query it
 
     def __str__(self):
-        return self.full_name or self.url
+        return self.name or self.linkedin_url
+
+class DailyStats(models.Model):
+    """Daily metrics for automation actions."""
+    date = models.DateField(unique=True, default=timezone.now)
+    connections_sent = models.IntegerField(default=0)
+    connections_accepted = models.IntegerField(default=0)
+    messages_sent = models.IntegerField(default=0)
+    profiles_searched = models.IntegerField(default=0)
+    errors = models.IntegerField(default=0)
+    
+    class Meta:
+        verbose_name_plural = "Daily Stats"
+
+    def __str__(self):
+        return str(self.date)
+
+class ConnectionTracking(models.Model):
+    """History of sent connection requests."""
+    profile_url = models.URLField()
+    profile_name = models.CharField(max_length=500, blank=True)
+    sent_at = models.DateTimeField(default=timezone.now)
+    status = models.CharField(max_length=20, default='pending')
+    note = models.TextField(blank=True)
+    error = models.TextField(blank=True, null=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['profile_url']),
+            models.Index(fields=['sent_at']),
+        ]
+
+class MessageTracking(models.Model):
+    """History of sent messages."""
+    recipient_url = models.URLField()
+    recipient_name = models.CharField(max_length=500, blank=True)
+    content = models.TextField()
+    sent_at = models.DateTimeField(default=timezone.now)
+    template_used = models.CharField(max_length=255, blank=True)
+    error = models.TextField(blank=True, null=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['recipient_url']),
+            models.Index(fields=['sent_at']),
+        ]
 
 class Settings(models.Model):
     """Store global configuration."""

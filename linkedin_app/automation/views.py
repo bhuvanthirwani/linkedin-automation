@@ -1,20 +1,27 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
-from .models import Job, LogEntry, LinkedInProfile
+from .models import Job, LogEntry, LinkedInProfile, DailyStats
+from django.db.models import Sum
 from .services import AutomationService
 
 def dashboard(request):
     """Render the main dashboard."""
-    # Sync view is fine for dashboard read
     recent_jobs = Job.objects.order_by('-created_at')[:5]
+    
+    # Fetch today's stats from DailyStats model
+    from django.utils import timezone
+    today = timezone.now().date()
+    stats_today = DailyStats.objects.filter(date=today).first()
+    
     total_profiles = LinkedInProfile.objects.count()
-    total_connections_sent = LinkedInProfile.objects.filter(connection_request_sent=True).count()
     
     context = {
         'jobs': recent_jobs,
         'stats': {
             'profiles': total_profiles,
-            'connections_sent': total_connections_sent
+            'connections_sent': stats_today.connections_sent if stats_today else 0,
+            'messages_sent': stats_today.messages_sent if stats_today else 0,
+            'errors': stats_today.errors if stats_today else 0,
         }
     }
     return render(request, 'automation/dashboard.html', context)
