@@ -44,20 +44,14 @@ class SalesNavConnectionManager:
         self.database_manager = database_manager
         self.parser = SalesNavParser(browser)
     
-    def run_automation(
-        self,
-        base_url: str,
-        end_page: int,
-        limit: int,
-        message: Optional[str] = None
-    ):
+    def run_automation(self, base_url: str, start_page: int, end_page: int, limit: int, message: Optional[str] = None) -> None:
         """
         Main loop for Sales Navigator connection automation.
         """
-        logger.info(f"Starting Sales Navigator connection automation. Limit: {limit}, End Page: {end_page}")
+        logger.info(f"Starting Sales Navigator connection automation. Start: {start_page}, End: {end_page}, Limit: {limit}")
         
         sent_count = 0
-        current_page = 1
+        current_page = start_page
         
         while current_page <= end_page and sent_count < limit:
             # Construct page URL

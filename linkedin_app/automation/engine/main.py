@@ -236,7 +236,7 @@ class LinkedInBot:
         """Run the Send_Requests mode."""
         self.request_sender.execute(limit)
 
-    def run_sales_nav_connection(self, url: str, end_page: int, limit: int, message: Optional[str] = None) -> None:
+    def run_sales_nav_connection(self, url: str, start_page: int, end_page: int, limit: int, message: Optional[str] = None) -> None:
         """Run the Sales Navigator connection automation."""
         # Fallback to default template if no message provided
         if not message:
@@ -244,7 +244,7 @@ class LinkedInBot:
             logger.info("No message provided, using default template from config.")
             
         mgr = SalesNavConnectionManager(self.browser, self.connection_tracker, self.database_manager)
-        mgr.run_automation(url, end_page, limit, message)
+        mgr.run_automation(url, start_page, end_page, limit, message)
 
 
 

@@ -73,6 +73,7 @@ class AutomationService:
                 elif command == "SalesNavigator_Connect":
                     bot.run_sales_nav_connection(
                         url=params.get('sales_nav_url', ''),
+                        start_page=int(params.get('start_page', 1)),
                         end_page=int(params.get('end_page', 1)),
                         limit=int(params.get('max_connections', 10)),
                         message=params.get('message', '')
