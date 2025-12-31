@@ -23,6 +23,7 @@ This project is a powerful, educational Python-based automation tool designed to
 
 | Feature | Description |
 | :--- | :--- |
+| 🤖 **Sales Nav Connect** | Specialized automation for **Sales Navigator** with pagination and personalized messaging. |
 | 🛡️ **Anti-Detection** | Human-like mouse movements, random delays, and typing simulation to fly under the radar. |
 | 🔍 **Smart Search** | Advanced filtering by **Job Title**, **Company**, **Location**, and **Keywords**. |
 | 🗄️ **Database Integration** | Seamlessly fetch targets from a PostgreSQL database for scalable campaigns. |
@@ -34,7 +35,7 @@ This project is a powerful, educational Python-based automation tool designed to
 
 ## 🛠️ Installation
 
-### 1. Prerequisities
+### 1. Prerequisites
 - **Python 3.10+** (Stable version recommended. **Note**: Python 3.14 may cause issues with dependencies like `pydantic`).
 - **Node.js** (Optional, for advanced Tailwind support).
 
@@ -64,7 +65,7 @@ playwright install chromium
 ## ⚙️ Configuration
 
 ### 1. Environment Variables / Config
-The app continues to use `configs/config.yaml` for automation settings. Ensure this file exists:
+The app uses `configs/config.yaml` for automation settings. Ensure this file exists:
 ```bash
 cp configs/config.example.yaml configs/config.yaml
 ```
@@ -84,7 +85,11 @@ Then open your browser at **[http://127.0.0.1:8000](http://127.0.0.1:8000)**.
 
 ### Features
 - **Dashboard**: View real-time statistics and start new jobs.
-- **Modes**: Select from Scrapping, Filtering, or Sending modes directly from the UI.
+- **Sales Navigator Connect**: 
+  - Paste your Sales Navigator search URL.
+  - Set **Start Page** and **End Page** to resume runs.
+  - Provide an optional message (fallbacks to `config.yaml` template).
+  - Handles **Email Required** profiles by automatically skipping them.
 - **Live Logs**: Watch the automation logs stream in real-time in the "Terminal Output" window.
 
 <details>
@@ -103,58 +108,11 @@ rate_limits:
   daily_message_limit: 50
   min_delay_seconds: 5
   max_delay_seconds: 15
+
+messaging:
+  connection_note_template: "Hi {first_name}, I saw your profile and..."
 ```
 </details>
-
----
-
-## 🚀 Usage Guide
-
-Run the bot with `python run.py`. Below are the common modes of operation.
-
-### 🔍 Scrapping Mode
-*Scrapes profiles from search results and saves them to the database.*
-```bash
-python run.py --mode Scrapping \
-    --keywords "Senior Software Engineer" \
-    --location "90000084" \
-    --start-page 1 \
-    --pages 5 \
-    --max-connections 50
-```
-
-### 🎯 Filtering & Sending
-*Checks scraped profiles for activity and sends requests.*
-```bash
-python run.py --mode Filtering --max-connections 20
-```
-
-### 📦 Database Mode
-*Fetch specific targets from your database and connect.*
-```bash
-python run.py --mode database --max-connections 15
-```
-
-### 🤖 Search & Connect (Direct)
-*Search and connect immediately (bypassing database).*
-```bash
-python run.py --mode search \
-    --keywords "Founder" \
-    --location "90000084" \
-    --max-connections 10
-```
-
-### 📨 Follow-Up Messages
-*Send follow-up messages to people who accepted your request.*
-```bash
-python run.py --mode followup --max-messages 10
-```
-
-### 🧪 Dry Run
-*Test your command without performing actual actions.*
-```bash
-python run.py --mode <ANY_MODE> --dry-run
-```
 
 ---
 
@@ -162,18 +120,20 @@ python run.py --mode <ANY_MODE> --dry-run
 
 ```bash
 linkedin-automation/
-├── 📁 configs/          # Configuration files
-├── 📁 data/             # Persistent data (cookies, tracking logs)
-├── 📁 src/              # Source code
-│   ├── 📁 auth/         # Login & Session management
-│   ├── 📁 browser/      # Playwright wrapper & Anti-detect
-│   ├── 📁 connection/   # Connection logic & Note composition
-│   ├── 📁 database/     # DB operations
-│   ├── 📁 features/     # High-level workflows (Scrapers, Filters)
-│   ├── 📁 messaging/    # Message templates & Sending logic
-│   └── 📁 search/       # Search execution & Parsing
-├── 📄 run.py            # CLI Entry point
-└── 📄 requirements.txt  # Dependencies
+├── 📁 linkedin_app/          # Main Web Application (Django)
+│   ├── 📁 automation/        # Core Automation Logic
+│   │   ├── 📁 engine/        # The "Brain" of the bot
+│   │   │   ├── 📁 browser/   # Playwright wrapper & Humanization
+│   │   │   ├── 📁 connection/# Sales Nav & Standard connection flows
+│   │   │   ├── 📁 database/  # PostgreSQL / Django ORM integration
+│   │   │   ├── 📁 messaging/ # Message formatting & sending
+│   │   │   └── 📁 search/    # Sales Nav & Standard parsers
+│   │   ├── 📁 static/        # CSS/JS for the dashboard
+│   │   └── 📁 templates/     # UI HTML files
+│   └── 📄 manage.py          # Django management script
+├── 📁 configs/               # Global configuration (YAML)
+├── 📁 data/                  # Browser sessions & cookies
+└── 📄 requirements.txt       # Dependencies
 ```
 
 ---

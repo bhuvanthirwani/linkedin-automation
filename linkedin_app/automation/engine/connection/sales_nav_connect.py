@@ -21,8 +21,10 @@ from ..search.sales_nav_parser import SalesNavParser
 THREE_DOTS_BUTTON = "button[aria-label^='See more actions for']"
 CONNECT_OPTION = "div[data-control-name='connect']"
 MODAL_SEND_BUTTON = "button.connect-cta-form__send"
+MODAL_CANCEL_BUTTON = "button.connect-cta-form__cancel"
 MODAL_MESSAGE_TEXTAREA = "textarea#connect-cta-form__invitation"
 MODAL_ADD_NOTE_BUTTON = "button:has-text('Add a note')"
+MODAL_EMAIL_REQUIRED_FIELD = "input#connect-cta-form__email"
 
 # Pagination
 NEXT_PAGE_BUTTON = "button.search-results__pagination-next-button"
@@ -229,6 +231,17 @@ class SalesNavConnectionManager:
             # 3. Handle modal
             if not self.browser.wait_for_element("div.artdeco-modal", timeout=10000):
                 logger.warning("Connection modal did not appear.")
+                return False
+            
+            # 4. Check if email is required (Edge Case)
+            email_field = self.browser.page.locator(MODAL_EMAIL_REQUIRED_FIELD)
+            if email_field.is_visible():
+                logger.warning("Email is required to connect with this profile. Skipping...")
+                cancel_btn = self.browser.page.locator(MODAL_CANCEL_BUTTON)
+                if cancel_btn.is_visible():
+                    cancel_btn.click()
+                else:
+                    self.browser.page.keyboard.press("Escape")
                 return False
             
             # Add message if provided (or use a default if user wants)
